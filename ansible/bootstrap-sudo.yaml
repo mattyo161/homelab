@@ -1,0 +1,13 @@
+- name: Allow passwordless sudo for automation user
+  hosts: k3s_cluster   # or a bootstrap group
+  become: true
+  tasks:
+    - name: Install sudoers drop-in for matt
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/99-matt-ansible
+        mode: "0440"
+        owner: root
+        group: root
+        content: |
+          matt ALL=(ALL) NOPASSWD:ALL
+        validate: /usr/sbin/visudo -cf %s

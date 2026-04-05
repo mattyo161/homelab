@@ -1,0 +1,48 @@
+---
+# roles/k3s/tasks/main.yml
+# Applied to all nodes in the k3scluster- cgroups, swap, packages
+
+- name: Disable swap
+  command: dphys-swapfile swapoff
+  ignore_errors: true
+
+- name: Disable swap service
+  systemd:
+    name: dphys-swapfile
+    enabled: false
+    state: stopped
+  ignore_errors: true
+
+- name: Disable zram swap
+  command: swapoff -a
+  ignore_errors: true
+
+- name: Check if cgroups already enabled
+  command: grep -q "cgroup_memory=1" /boot/firmware/cmdline.txt
+  register: cgroups_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Enable cgroups in cmdline.txt
+  replace:
+    path: /boot/firmware/cmdline.txt
+    regexp: '(\s*)$'
+    replace: ' cgroup_memory=1 cgroup_enable=memory\1'
+  when: cgroups_check.rc != 0
+  notify: reboot required
+
+- name: Install required packages
+  apt:
+    name:
+      - curl
+      - open-iscsi
+      - nfs-common
+      - avahi-daemon
+    state: present
+    update_cache: true
+
+- name: Enable iscsid
+  systemd:
+    name: iscsid
+    enabled: true
+    state: started

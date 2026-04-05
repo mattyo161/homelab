@@ -1,0 +1,4 @@
+---
+# roles/common/tasks/main.yml
+# Applied to all nodes - cgroups, swap, packages
+

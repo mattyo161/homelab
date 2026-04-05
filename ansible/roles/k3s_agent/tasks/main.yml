@@ -1,0 +1,44 @@
+---
+# roles/k3s_agent/tasks/main.yml
+
+- name: Check if k3s agent already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Get k3s server token from control plane
+  set_fact:
+    k3s_node_token: "{{ hostvars[groups['control_plane'][0]]['k3s_node_token'] }}"
+    k3s_server_url: "{{ hostvars[groups['control_plane'][0]]['k3s_server_url'] }}"
+
+- name: Install k3s agent
+  shell: |
+    curl -sfL https://get.k3s.io | \
+    INSTALL_K3S_VERSION="{{ k3s_version }}" \
+    K3S_URL="{{ k3s_server_url }}" \
+    K3S_TOKEN="{{ k3s_node_token }}" \
+    sh -
+  when: not k3s_binary.stat.exists
+
+- name: Verify k3s agent is running
+  systemd:
+    name: k3s-agent
+    state: started
+    enabled: true
+
+- name: Wait for node to be ready
+  pause:
+    seconds: 15
+
+- name: Confirm node joined from control plane
+  command: kubectl get nodes
+  changed_when: false
+  delegate_to: "{{ groups['control_plane'][0] }}"
+  become: true
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: nodes_output
+
+- name: Show cluster nodes
+  debug:
+    msg: "{{ nodes_output.stdout_lines }}"

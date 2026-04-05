@@ -1,0 +1,56 @@
+---
+# roles/k3s_server/tasks/main.yml
+
+- name: Check if k3s server already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Install k3s server
+  shell: |
+    curl -sfL https://get.k3s.io | \
+    INSTALL_K3S_VERSION="{{ k3s_version }}" \
+    sh -
+  when: not k3s_binary.stat.exists
+
+- name: Wait for k3s to be ready
+  wait_for:
+    path: /var/lib/rancher/k3s/server/node-token
+    timeout: 60
+
+- name: Read node token
+  slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: node_token_raw
+
+- name: Set node token fact
+  set_fact:
+    k3s_node_token: "{{ node_token_raw.content | b64decode | trim }}"
+
+- name: Get k3s server IP
+  set_fact:
+    k3s_server_url: "https://{{ ansible_default_ipv4.address }}:6443"
+
+- name: Verify k3s is running
+  systemd:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Check nodes
+  command: kubectl get nodes
+  changed_when: false
+  register: nodes_output
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Show nodes
+  debug:
+    msg: "{{ nodes_output.stdout_lines }}"
+
+- name: Fetch kubeconfig to local machine
+  fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "~/.kube/config-mou-pi5"
+    flat: true
+  ignore_errors: true

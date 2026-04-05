@@ -1,0 +1,50 @@
+---
+# roles/rpi_connect/tasks/main.yml
+
+- name: Install rpi-connect-lite
+  apt:
+    name: rpi-connect-lite
+    state: present
+    update_cache: true
+
+- name: Create rpi-connect config directory
+  file:
+    path: "/home/{{ rpi_connect_user }}/.config/com.raspberrypi.connect"
+    state: directory
+    owner: "{{ rpi_connect_user }}"
+    group: "{{ rpi_connect_user }}"
+    mode: '0700'
+
+- name: Write auth key
+  copy:
+    content: "{{ rpi_connect_auth_key }}\n"
+    dest: "/home/{{ rpi_connect_user }}/.config/com.raspberrypi.connect/auth.key"
+    owner: "{{ rpi_connect_user }}"
+    group: "{{ rpi_connect_user }}"
+    mode: '0600'
+
+- name: Enable lingering for rpi-connect user
+  command: loginctl enable-linger {{ rpi_connect_user }}
+  changed_when: false
+
+- name: Create systemd user directories
+  file:
+    path: "/home/{{ rpi_connect_user }}/.config/systemd/user/{{ item }}"
+    state: directory
+    owner: "{{ rpi_connect_user }}"
+    group: "{{ rpi_connect_user }}"
+    mode: '0700'
+  loop:
+    - default.target.wants
+    - paths.target.wants
+
+- name: Enable rpi-connect service
+  become: false
+  systemd:
+    name: rpi-connect
+    enabled: true
+    state: started
+    scope: user
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.user_uid }}"
+  ignore_errors: true

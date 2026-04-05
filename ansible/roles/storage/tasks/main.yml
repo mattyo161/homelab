@@ -1,104 +1,104 @@
----
-# roles/storage/tasks/main.yml
-# Partition, format and mount USB drive
+# ---
+# # roles/storage/tasks/main.yml
+# # Partition, format and mount USB drive
 
-- name: Check if USB device exists
-  stat:
-    path: "{{ usb_device }}"
-  register: usb_stat
+# - name: Check if USB device exists
+#   stat:
+#     path: "{{ usb_device }}"
+#   register: usb_stat
 
-- name: Fail if USB device not found
-  fail:
-    msg: "USB device {{ usb_device }} not found"
-  when: not usb_stat.stat.exists
+# - name: Fail if USB device not found
+#   fail:
+#     msg: "USB device {{ usb_device }} not found"
+#   when: not usb_stat.stat.exists
 
-- name: Check if already partitioned
-  command: blkid {{ usb_device }}1
-  register: partition_check
-  ignore_errors: true
-  changed_when: false
+# - name: Check if already partitioned
+#   command: blkid {{ usb_device }}1
+#   register: partition_check
+#   ignore_errors: true
+#   changed_when: false
 
-- name: Partition USB drive
-  block:
-    - name: Create partition table
-      parted:
-        device: "{{ usb_device }}"
-        label: msdos
-        state: present
+# - name: Partition USB drive
+#   block:
+#     - name: Create partition table
+#       parted:
+#         device: "{{ usb_device }}"
+#         label: msdos
+#         state: present
 
-    - name: Create k3s partition (20GB)
-      parted:
-        device: "{{ usb_device }}"
-        number: 1
-        state: present
-        fs_type: ext4
-        part_end: "{{ k3s_partition_size }}"
+#     - name: Create k3s partition (20GB)
+#       parted:
+#         device: "{{ usb_device }}"
+#         number: 1
+#         state: present
+#         fs_type: ext4
+#         part_end: "{{ k3s_partition_size }}"
 
-    - name: Create longhorn partition (remaining space)
-      parted:
-        device: "{{ usb_device }}"
-        number: 2
-        state: present
-        fs_type: ext4
-        part_start: "{{ k3s_partition_size }}"
-        part_end: "100%"
+#     - name: Create longhorn partition (remaining space)
+#       parted:
+#         device: "{{ usb_device }}"
+#         number: 2
+#         state: present
+#         fs_type: ext4
+#         part_start: "{{ k3s_partition_size }}"
+#         part_end: "100%"
 
-  when: partition_check.rc != 0
+#   when: partition_check.rc != 0
 
-- name: Format k3s partition
-  filesystem:
-    fstype: ext4
-    dev: "{{ usb_device }}1"
-    opts: "-L k3s"
-    force: false
+# - name: Format k3s partition
+#   filesystem:
+#     fstype: ext4
+#     dev: "{{ usb_device }}1"
+#     opts: "-L k3s"
+#     force: false
 
-- name: Format longhorn partition
-  filesystem:
-    fstype: ext4
-    dev: "{{ usb_device }}2"
-    opts: "-L longhorn"
-    force: false
+# - name: Format longhorn partition
+#   filesystem:
+#     fstype: ext4
+#     dev: "{{ usb_device }}2"
+#     opts: "-L longhorn"
+#     force: false
 
-- name: Create mount points
-  file:
-    path: "{{ item }}"
-    state: directory
-    mode: '0755'
-  loop:
-    - "{{ k3s_mount_point }}"
-    - "{{ longhorn_mount_point }}"
+# - name: Create mount points
+#   file:
+#     path: "{{ item }}"
+#     state: directory
+#     mode: '0755'
+#   loop:
+#     - "{{ k3s_mount_point }}"
+#     - "{{ longhorn_mount_point }}"
 
-- name: Get k3s partition UUID
-  command: blkid -s UUID -o value {{ usb_device }}1
-  register: k3s_uuid
-  changed_when: false
+# - name: Get k3s partition UUID
+#   command: blkid -s UUID -o value {{ usb_device }}1
+#   register: k3s_uuid
+#   changed_when: false
 
-- name: Get longhorn partition UUID
-  command: blkid -s UUID -o value {{ usb_device }}2
-  register: longhorn_uuid
-  changed_when: false
+# - name: Get longhorn partition UUID
+#   command: blkid -s UUID -o value {{ usb_device }}2
+#   register: longhorn_uuid
+#   changed_when: false
 
-- name: Mount k3s partition persistently
-  mount:
-    path: "{{ k3s_mount_point }}"
-    src: "UUID={{ k3s_uuid.stdout }}"
-    fstype: ext4
-    opts: defaults
-    state: mounted
+# - name: Mount k3s partition persistently
+#   mount:
+#     path: "{{ k3s_mount_point }}"
+#     src: "UUID={{ k3s_uuid.stdout }}"
+#     fstype: ext4
+#     opts: defaults
+#     state: mounted
 
-- name: Mount longhorn partition persistently
-  mount:
-    path: "{{ longhorn_mount_point }}"
-    src: "UUID={{ longhorn_uuid.stdout }}"
-    fstype: ext4
-    opts: defaults
-    state: mounted
+# - name: Mount longhorn partition persistently
+#   mount:
+#     path: "{{ longhorn_mount_point }}"
+#     src: "UUID={{ longhorn_uuid.stdout }}"
+#     fstype: ext4
+#     opts: defaults
+#     state: mounted
 
-- name: Verify mounts
-  command: df -h {{ k3s_mount_point }} {{ longhorn_mount_point }}
-  changed_when: false
-  register: mount_verify
+# - name: Verify mounts
+#   command: df -h {{ k3s_mount_point }} {{ longhorn_mount_point }}
+#   changed_when: false
+#   register: mount_verify
 
-- name: Show mount info
-  debug:
-    msg: "{{ mount_verify.stdout_lines }}"
+# - name: Show mount info
+#   debug:
+#     msg: "{{ mount_verify.stdout_lines }}"

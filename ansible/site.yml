@@ -8,8 +8,10 @@
 # Run specific phases:
 #   ansible-playbook -i inventory/hosts.yml site.yml --tags common
 #   ansible-playbook -i inventory/hosts.yml site.yml --tags storage
-#   ansible-playbook -i inventory/hosts.yml site.yml --tags k3s
 #   ansible-playbook -i inventory/hosts.yml site.yml --tags rpi_connect
+#
+# k3s is provided by collection k3s.orchestration (see Phase 4 below). For k3s-only runs or
+# kubeconfig refresh, use the collection playbook directly (README.md).
 #
 # Dry run:
 #   ansible-playbook -i inventory/hosts.yml site.yml --check
@@ -23,33 +25,20 @@
     - common
 
 # Phase 2 — USB drive storage setup on all nodes
-- name: Storage setup
-  hosts: k3s_cluster
-  become: true
-  tags: storage
-  roles:
-    - storage
+# - name: Storage setup
+#   hosts: k3s_cluster
+#   become: true
+#   tags: storage
+#   roles:
+#     - storage
 
 # Phase 3 — rpi-connect on all nodes
-- name: rpi-connect setup
-  hosts: k3s_cluster
-  become: true
-  tags: rpi_connect
-  roles:
-    - rpi_connect
+# - name: rpi-connect setup
+#   hosts: k3s_cluster
+#   become: true
+#   tags: rpi_connect
+#   roles:
+#     - rpi_connect
 
-# Phase 4 — k3s control plane (must run before agents)
-- name: k3s control plane
-  hosts: control_plane
-  become: true
-  tags: k3s
-  roles:
-    - k3s_server
-
-# Phase 5 — k3s worker nodes
-- name: k3s worker nodes
-  hosts: workers
-  become: true
-  tags: k3s
-  roles:
-    - k3s_agent
+# Phase 4 — k3s cluster (official k3s-io/k3s-ansible collection)
+- import_playbook: k3s.orchestration.site

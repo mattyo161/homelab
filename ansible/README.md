@@ -1,116 +1,160 @@
 # Homelab k3s Ansible Playbooks
 
-Provisions a k3s homelab cluster with 3 control-plane nodes and 3 workder nodes, distributed across a mix of hardware. Configs will certainly change overtime as such these docs may not always be up to date.
+Provisions a k3s homelab cluster with control-plane (`server`) and worker (`agent`) groups, distributed across mixed hardware. Configs change over time; these docs may not always match the live layout.
+
+**Repeatable setup and decisions:** see [docs/SETUP.md](../docs/SETUP.md) (paved path), [docs/NOTES.md](../docs/NOTES.md) (running notes), and [docs/design_decision_documents/](../docs/design_decision_documents/) (ADRs).
 
 ## Prerequisites
 
-- Ansible installed on your MacBook
-- SSH key-based access to both Pis
-- Both Pis running Raspberry Pi OS Lite 64-bit
-- USB drives attached to both nodes
-- Mac Minis with Ubuntu 24.04 Server installed
-- PC with Linux installed
-- Each instance has `~/.ssh/authorized_keys` updated with laptop ssh key
+- **Ansible 8+** (ansible-core **2.15+**) on the machine that runs playbooks
+- SSH key-based access to all nodes
+- **Passwordless sudo** (or equivalent) for the Ansible user on targets — see `bootstrap-sudo.yaml` / `bootstrap-user-ansible.yaml`
+- Raspberry Pi OS Lite 64-bit, Ubuntu Server, or other OSes supported by [k3s-io/k3s-ansible](https://github.com/k3s-io/k3s-ansible)
+- Each node has `~/.ssh/authorized_keys` updated for your key (or the dedicated `ansible` user after bootstrap)
 
-## Project Structure
+## k3s: Galaxy collection
+
+Cluster install uses the official **`k3s.orchestration`** collection ([k3s-io/k3s-ansible](https://github.com/k3s-io/k3s-ansible)), not the legacy `roles/k3s*`.
+
+### Install collections
+
+From the `ansible/` directory:
+
+```bash
+ansible-galaxy collection install -r collections/requirements.yml
+```
+
+This pulls `k3s.orchestration` (pinned to `v1.2.0` in `collections/requirements.yml`) and its dependencies (`community.general`, `ansible.posix`).
+
+### Cluster token and secrets
+
+1. Copy the example secrets file:
+
+   ```bash
+   cp group_vars/k3s_cluster/secrets.yml.example group_vars/k3s_cluster/secrets.yml
+   ```
+
+2. Set `token` to a long random string (e.g. `openssl rand -base64 64`).
+
+3. Encrypt with Ansible Vault (recommended):
+
+   ```bash
+   ansible-vault encrypt group_vars/k3s_cluster/secrets.yml
+   ```
+
+4. Run playbooks with `--ask-vault-pass` or a **local** `vault_password_file` in `ansible.cfg` (do not commit the password file).
+
+`group_vars/k3s_cluster/main.yml` holds non-secret settings (`k3s_version`, `api_endpoint`, `cluster_context`). With **three** nodes in `server`, the collection installs **embedded etcd HA**; for a single stable API address in front of all servers, set `api_endpoint` to your DNS/VIP instead of the default first-host expression.
+
+## Project structure
 
 ```
 ansible/
-├── ansible.cfg               # Ansible config
-├── site.yml                  # Main playbook
+├── ansible.cfg
+├── site.yml
+├── collections/
+│   └── requirements.yml       # k3s.orchestration + pin
 ├── inventory/
-│   └── hosts.yml             # Node inventory
+│   └── hosts.yml              # k3s_cluster → server, agent
 ├── group_vars/
-│   └── all.yml               # Variables for all nodes
-├── host_vars/
-│   ├── mou-pi5.yml           # Pi 5 specific vars (rpi-connect key)
-│   └── mou-pi4.yml           # Pi 4 specific vars (rpi-connect key)
+│   └── k3s_cluster/
+│       ├── main.yml           # k3s_version, api_endpoint, cluster_context
+│       └── secrets.yml.example
+├── host_vars/                 # per-host vars (e.g. rpi-connect)
 └── roles/
-    ├── common/               # cgroups, swap, packages
-    ├── storage/              # USB partitioning + mounting
-    ├── rpi_connect/          # rpi-connect-lite setup
-    ├── k3s/                  # k3s common configuration
-    ├── k3s_server/           # k3s control plane
-    └── k3s_agent/            # k3s worker node
+    ├── common/
+    ├── storage/
+    ├── rpi_connect/
+    └── k3s, k3s_server, k3s_agent/   # legacy (unused; collection replaces)
 ```
 
 ## Setup
 
-### 1. Update auth keys
-Edit `host_vars/mou-pi5.yml` and `host_vars/mou-pi4.yml` with your rpi-connect auth keys from https://connect.raspberrypi.com/settings
+### 1. Install Galaxy collections and secrets
 
-### 2. Verify SSH access
+See [k3s: Galaxy collection](#k3s-galaxy-collection) above.
+
+### 2. Optional: rpi-connect keys
+
+Edit `host_vars/<hostname>.yml` with rpi-connect keys from https://connect.raspberrypi.com/settings when using the `rpi_connect` role.
+
+### 3. Verify SSH
+
 ```bash
+cd ansible
 ansible all -i inventory/hosts.yml -m ping
 ```
 
-### 3. Run the full playbook
+### 4. Run the full playbook
+
 ```bash
-ansible-playbook site.yml
+ansible-playbook -i inventory/hosts.yml site.yml
 ```
 
-## Run Individual Phases
+If `secrets.yml` is vault-encrypted, add `--ask-vault-pass` (or configure `vault_password_file`).
+
+## Run individual phases
 
 ```bash
-# Common setup only (cgroups, swap, packages)
-ansible-playbook site.yml --tags common
+# Common role only
+ansible-playbook -i inventory/hosts.yml site.yml --tags common
 
-# Storage only (partition + mount USB drives)
-ansible-playbook site.yml --tags storage
+# Storage / rpi_connect (when those plays are uncommented in site.yml)
+ansible-playbook -i inventory/hosts.yml site.yml --tags storage
+ansible-playbook -i inventory/hosts.yml site.yml --tags rpi_connect
 
-# rpi-connect only
-ansible-playbook site.yml --tags rpi_connect
+# k3s only (collection playbook; same inventory and group_vars apply)
+ansible-playbook -i inventory/hosts.yml k3s.orchestration.site --ask-vault-pass
 
-# k3s install only (server + agent)
-ansible-playbook site.yml --tags k3s
+# Refresh kubeconfig on controller after install (per upstream README)
+ansible-playbook -i inventory/hosts.yml k3s.orchestration.site --tags kubeconfig --ask-vault-pass
 
-# Dry run (no changes made)
-ansible-playbook site.yml --check
+# Upgrade k3s after bumping k3s_version in group_vars/k3s_cluster/main.yml
+ansible-playbook -i inventory/hosts.yml k3s.orchestration.upgrade --ask-vault-pass
 
-# Single host only
-ansible-playbook site.yml --limit mou-pi5
+# Dry run
+ansible-playbook -i inventory/hosts.yml site.yml --check
+
+# Limit to one host
+ansible-playbook -i inventory/hosts.yml site.yml --limit mou-pi5
 ```
 
-## After Install
+The k3s collection plays use **upstream** tags (not `common`). With `site.yml`, `--tags common` typically runs **only** the common play and **skips** the imported k3s plays. Run **`k3s.orchestration.site`** directly when you want k3s only.
 
-### Verify cluster
-```bash
-# On mou-pi5
-kubectl get nodes
+## After install
 
-# Expected output:
-# NAME       STATUS   ROLES                  AGE   VERSION
-# mou-pi5    Ready    control-plane,master   Xm    v1.29.x
-# mou-pi4    Ready    <none>                 Xm    v1.29.x
-```
+### kubectl on the Ansible controller
 
-### Use kubectl from MacBook
-The playbook fetches the kubeconfig to `~/.kube/config-mou-pi5`.
-Update the server IP and merge with your local kubeconfig:
+The collection merges kubeconfig into **`~/.kube/config`** with context **`k3s-ansible`** (override with `cluster_context` in `group_vars/k3s_cluster/main.yml`).
 
 ```bash
-# Update server address in fetched config
-sed -i 's/127.0.0.1/<pi5-ip>/g' ~/.kube/config-mou-pi5
-
-# Set as active config
-export KUBECONFIG=~/.kube/config-mou-pi5
-
-# Verify
+kubectl config use-context k3s-ansible
 kubectl get nodes
 ```
 
-## Adding a New Node
+Ensure the API URL in that context is reachable from your machine (same network or correct `api_endpoint` / DNS).
 
-1. Flash Raspberry Pi OS Lite 64-bit
-2. Add node to `inventory/hosts.yml` under `workers`
-3. Add `host_vars/<hostname>.yml` with rpi-connect key
+### Verify from a node
+
+If `kubectl` is configured on a server node:
+
+```bash
+sudo kubectl get nodes
+```
+
+## Adding a new node
+
+1. Install OS and SSH access.
+2. Add the host under `server` or `agent` in `inventory/hosts.yml`.
+3. Add `host_vars/<hostname>.yml` if needed (e.g. rpi-connect).
 4. Run:
-```bash
-ansible-playbook site.yml --limit <new-hostname>
-```
+
+   ```bash
+   ansible-playbook -i inventory/hosts.yml site.yml --limit <hostname> --ask-vault-pass
+   ```
 
 ## Notes
 
-- rpi-connect auth keys are **one use only** — get a fresh key per node from connect.raspberrypi.com
-- The storage role will **not** reformat drives if partitions already exist
-- k3s server must complete before agents can join — site.yml handles this ordering automatically
+- rpi-connect auth keys are **one use only** — use a fresh key per node where applicable.
+- The storage role does **not** reformat drives if partitions already exist.
+- [K3s requirements](https://docs.k3s.io/installation/requirements): swap, firewall, and OS prep matter for a clean install.

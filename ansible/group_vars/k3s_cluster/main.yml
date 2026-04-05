@@ -1,0 +1,12 @@
+---
+# Variables for k3s.orchestration (k3s-io/k3s-ansible).
+# Required secret `token` — see secrets.yml.example and README.md.
+
+k3s_version: v1.31.12+k3s1
+
+# API endpoint agents (and kubectl) use to reach the Kubernetes API.
+# First server hostname/IP; for stricter HA, point at a stable DNS/VIP in front of all servers.
+api_endpoint: "{{ hostvars[groups['server'][0]]['ansible_host'] | default(groups['server'][0]) }}"
+
+# Merged into ~/.kube/config on the Ansible controller after install.
+cluster_context: k3s-ansible

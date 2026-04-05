@@ -18,12 +18,14 @@
   ignore_errors: true
 
 - name: Check if cgroups already enabled
+  # this is for talos 
   command: grep -q "cgroup_memory=1" /boot/firmware/cmdline.txt
   register: cgroups_check
   ignore_errors: true
   changed_when: false
 
 - name: Enable cgroups in cmdline.txt
+  # this is for talos 
   replace:
     path: /boot/firmware/cmdline.txt
     regexp: '(\s*)$'

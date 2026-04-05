@@ -1,0 +1,5 @@
+# k3s cluster token and other secrets (copy from group_vars/k3s_cluster/secrets.yml.example)
+group_vars/k3s_cluster/secrets.yml
+
+# Local vault password (optional; use with vault_password_file in ansible.cfg)
+.vault_pass

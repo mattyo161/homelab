@@ -8,6 +8,11 @@
 | [design_decision_documents/](design_decision_documents/) | **DDD** — decisions, rationale, alternatives, and follow-ups. |
 | [ddd/](ddd/) | Pointer to the same DDD folder (optional short path). |
 
+## Runbooks
+
+- [k3s-control-plane-reset.md](runbooks/k3s-control-plane-reset.md)
+- [ansible-inspect-vars-and-facts.md](runbooks/ansible-inspect-vars-and-facts.md)
+
 ## Design decision documents
 
 Number files with a zero-padded prefix so they sort chronologically:

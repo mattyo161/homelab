@@ -9,6 +9,31 @@ Running log of questions, answers, and practices that come up while building thi
 - **Roles are not assigned in inventory** with arbitrary `roles:` keys under groups (that conflicts with Ansible’s reserved structure and is skipped with warnings). Roles are listed in **playbooks** under `roles:`; inventory only defines **groups and hosts** (plus vars).
 - **`hosts:`** in a play selects machines; **`roles:`** lists what runs on them. To change “who gets k3s server vs agent,” move hosts between **`server`** and **`agent`** under **`k3s_cluster`**.
 
+## Inspecting merged variables for a host
+
+- **`ansible-inventory`** shows the **merged** vars for one host (inventory + `group_vars` + `host_vars`). From `ansible/`:
+
+  ```bash
+  ansible-inventory -i inventory/hosts.yml --host mou-pc1
+  ansible-inventory -i inventory/hosts.yml --host mou-pc1 --yaml
+  ```
+
+  With Vault-encrypted `group_vars`, add **`--ask-vault-pass`** or use **`ANSIBLE_VAULT_PASSWORD_FILE`** / **`vault_password_file`** in `ansible.cfg`.
+
+- **Full inventory dump** (all hosts/groups): `ansible-inventory -i inventory/hosts.yml --list --yaml`.
+
+- **Ad hoc `hostvars` during a run** (large output):  
+  `ansible mou-pc1 -i inventory/hosts.yml -m debug -a "var=hostvars[inventory_hostname]" --ask-vault-pass`
+
+## Facts, hostvars, and debug output strategy
+
+- **`hostvars` is broader than facts:** `hostvars[<host>]` contains merged inventory vars, `group_vars`/`host_vars`, play/role vars, `set_fact`, registered vars, and facts. It is not only `ansible_facts`.
+- **Preferred fact access:** use **`ansible_facts[...]`** (for example `ansible_facts['mounts']`, `ansible_facts['devices']`) instead of top-level aliases such as `ansible_mounts` / `ansible_devices`. This is more future-proof as fact injection warnings evolve.
+- **Fact availability:** values like mounts/devices exist only when facts are gathered (`gather_facts: true`) or loaded from fact cache.
+- **Stdout can be too noisy:** for large structures, write focused JSON/YAML artifacts to files (for example under `ansible/ansible-debug/`) instead of printing full `hostvars` to terminal.
+- **Fast fact gathering is normal:** performance comes from SSH connection reuse, host parallelism (`forks`), and relatively lightweight `setup` data; it can still vary with DNS/network and host load.
+- **Fact caching behavior:** by default Ansible gathers facts each run and keeps them in memory for that run only. Cross-run persistence requires explicit `fact_caching` configuration in `ansible.cfg`.
+
 ## Ordering control-plane bootstrap (HA)
 
 - For “one server first, then the rest,” the usual pattern is **separate inventory groups** (e.g. primary vs additional) and **ordered plays**, or **host vars** + `when:`—not relying on inventory order alone.

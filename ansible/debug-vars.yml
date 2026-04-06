@@ -1,0 +1,58 @@
+- name: Inspect runtime vars
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Create ansible-debug directory if it doesn't exist
+      ansible.builtin.file:
+        path: ansible-debug
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: false
+
+    - name: Write hostvars for this host to local yaml file
+      ansible.builtin.copy:
+        dest: "ansible-debug/{{ inventory_hostname }}-hostvars.yaml"
+        content: "{{ hostvars[inventory_hostname] | to_nice_yaml }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Write hostvars for this host to local json file
+      ansible.builtin.copy:
+        dest: "ansible-debug/{{ inventory_hostname }}-hostvars.json"
+        content: "{{ hostvars[inventory_hostname] | to_nice_json  }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Write ansible_facts for this host to local json file
+      ansible.builtin.copy:
+        dest: "ansible-debug/{{ inventory_hostname }}-ansible_facts.json"
+        content: "{{ ansible_facts | to_nice_json  }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Write groups to local json file
+      ansible.builtin.copy:
+        dest: "ansible-debug/groups.json"
+        content: "{{ groups | to_nice_json  }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Write hostvars to local json file
+      ansible.builtin.copy:
+        dest: "ansible-debug/hostvars.json"
+        content: "{{ hostvars | to_nice_json  }}"
+      delegate_to: localhost
+      become: false
+
+    # - name: Show groups
+    #   ansible.builtin.debug:
+    #     var: groups
+
+    # - name: Show hostvars for first server
+    #   ansible.builtin.debug:
+    #     var: hostvars
+
+    # - name: Show this host facts
+    #   ansible.builtin.debug:
+    #     var: ansible_facts

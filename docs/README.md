@@ -4,6 +4,7 @@
 |------|---------|
 | [SETUP.md](SETUP.md) | **Paved path** — ordered steps to reproduce the environment from scratch. |
 | [NOTES.md](NOTES.md) | **Running notes** — Q&A, practices, and reminders from day-to-day work. |
+| [runbooks/](runbooks/) | **Operational runbooks** — reset, recovery, and similar procedures. |
 | [design_decision_documents/](design_decision_documents/) | **DDD** — decisions, rationale, alternatives, and follow-ups. |
 | [ddd/](ddd/) | Pointer to the same DDD folder (optional short path). |
 

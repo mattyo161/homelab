@@ -50,6 +50,15 @@ Running log of questions, answers, and practices that come up while building thi
 
 - Playbook FQCN: **`k3s.orchestration.site`**; upgrade: **`k3s.orchestration.upgrade`**.
 - Requires **`token`**, **`k3s_version`**, **`api_endpoint`** (and inventory group layout **`server`** / **`agent`** under **`k3s_cluster`**). See **SETUP.md** and **001-secrets-and-ansible-vault.md**.
+- **`token` must be the literal variable name** at the **top level** of decrypted `group_vars/k3s_cluster/secrets.yml` (e.g. `token: "..."`, not nested under another key). Confirm Ansible sees it:  
+  `ansible-inventory -i inventory/hosts.yml --host mou-pc1 --yaml` (with vault unlocked) and look for **`token:`**.
+- **First vs additional server nodes:** In `inventory/hosts.yml`, the **first host listed** under **`server:`** is treated as the **first control-plane node**; any other `server` host uses a different task block in the upstream role. If **`token` is missing** on those additional servers, you can get **`'token' is undefined`** on the `lineinfile` task (upstream used `token | regex_escape` there but `token | default('')` on the first server). A one-line local fix is to change that `regexp` to use **`token | default('') | regex_escape`** in `~/.ansible/collections/ansible_collections/k3s/orchestration/roles/k3s_server/tasks/main.yml` (re-applying **`ansible-galaxy collection install`** overwrites the collection).
+
+- **Upstream deprecations / bugs (not our playbooks):** Warnings such as **`INJECT_FACTS_AS_VARS`** and use of **`ansible_hostname`** come from **k3s-io/k3s-ansible** under `~/.ansible/collections/...`, not from `homelab/ansible`. **Current approach:** ignore those messages until they matter. **Future options (pick when ready):**
+  1. **Ignore or suppress** — e.g. `deprecation_warnings = False` in `ansible.cfg` (hides all deprecations, not only this collection).
+  2. **Local patch** after each `ansible-galaxy collection install` — quick for homelab, easy to lose on reinstall.
+  3. **Upstream PR** to [k3s-io/k3s-ansible](https://github.com/k3s-io/k3s-ansible) (e.g. `ansible_hostname` → `ansible_facts['hostname']`, align `lineinfile` with `token | default('')`).
+  4. **Fork** the repo, apply fixes, point **`collections/requirements.yml`** at the fork (git URL + branch/tag), to own the timeline and learn the Ansible layout.
 
 ---
 

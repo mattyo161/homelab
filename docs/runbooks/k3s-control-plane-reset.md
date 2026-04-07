@@ -117,6 +117,49 @@ If etcd still lists **dead** control-plane members after reinstall attempts, see
 
 ---
 
+## 7. Post-recovery validation checklist
+
+After `mou-mini2` / `mou-pc1` (or any failed servers) are rejoined, run the following checks from the first server and from your controller:
+
+- [ ] Control-plane membership is complete and healthy:
+
+  ```bash
+  sudo kubectl get nodes -l node-role.kubernetes.io/control-plane=true -o wide
+  ```
+
+  Expect a **Ready** entry for each host in the inventory `server` group.
+
+- [ ] Core system workloads are healthy:
+
+  ```bash
+  sudo kubectl get pods -A -o wide
+  ```
+
+  Expect normal `Running` / expected `Completed` states and no persistent `CrashLoopBackOff` / `Pending`.
+
+- [ ] Traefik service-lb pods have recovered across joined nodes (if using default k3s components):
+
+  ```bash
+  sudo kubectl -n kube-system get pods -o wide | grep svclb-traefik
+  ```
+
+- [ ] Run an idempotency check from controller:
+
+  ```bash
+  cd ansible
+  ansible-playbook -i inventory/hosts.yml site.yml --limit server --ask-vault-pass
+  ```
+
+  Expect mostly `ok` with minimal `changed`. Investigate repeated changes in token/config tasks.
+
+- [ ] Optional full-cluster pass (servers + agents) once control plane is stable:
+
+  ```bash
+  ansible-playbook -i inventory/hosts.yml site.yml --ask-vault-pass
+  ```
+
+---
+
 ## Reference
 
 - Collection playbooks: `k3s.orchestration.site`, `k3s.orchestration.upgrade`, **`k3s.orchestration.reset`**

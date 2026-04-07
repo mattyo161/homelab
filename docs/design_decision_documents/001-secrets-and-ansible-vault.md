@@ -16,12 +16,15 @@ We need a repeatable pattern that:
 
 ## Decision
 
-1. Store k3s **`token`** in **`ansible/group_vars/k3s_cluster/secrets.yml`**, which is **gitignored**.
-2. Commit **`secrets.yml.example`** with a placeholder and instructions.
+1. Store k3s **`token`** in **`ansible/inventory/group_vars/k3s_cluster/secrets.yml`**, which is **gitignored**.
+2. Commit **`inventory/group_vars/k3s_cluster/secrets.yml.example`** with a placeholder and instructions.
 3. **Encrypt `secrets.yml` with Ansible Vault** before routine use (`ansible-vault encrypt ...`).
 4. Run playbooks with **`--ask-vault-pass`** or a **local-only** `vault_password_file` (never committed).
 
-Non-secret k3s variables (**`k3s_version`**, **`api_endpoint`**, **`cluster_context`**) remain in **`group_vars/k3s_cluster/main.yml`** (or inventory), which is safe to commit.
+Non-secret k3s variables (**`k3s_version`**, **`api_endpoint`**, **`cluster_context`**) remain in **`inventory/group_vars/k3s_cluster/main.yml`**, which is safe to commit.
+
+> **Why `inventory/group_vars/` and not `group_vars/` next to `site.yml`?**  
+> `site.yml` uses `import_playbook: k3s.orchestration.site` to delegate k3s provisioning to the collection. Ansible switches `playbook_dir` to the collection's directory when executing that imported play, so playbook-adjacent `group_vars/` (next to `site.yml`) is **not loaded** for any of those tasks. Inventory-adjacent `group_vars/` is always loaded regardless of which playbook is executing. See [DDD 003](003-vars-under-inventory-not-playbook.md) for the full explanation.
 
 ## Rationale
 
@@ -49,3 +52,5 @@ Non-secret k3s variables (**`k3s_version`**, **`api_endpoint`**, **`cluster_cont
 
 - [Ansible Vault](https://docs.ansible.com/ansible/latest/vault_guide/index.html)
 - [k3s-ansible inventory sample](https://github.com/k3s-io/k3s-ansible/blob/master/inventory-sample.yml)
+- [DDD 003 — Keep group_vars under inventory/](003-vars-under-inventory-not-playbook.md)
+- [Runbook: Ansible variable scopes and playbook relativity](../runbooks/ansible-variable-scopes-and-playbook-relativity.md)

@@ -40,5 +40,8 @@
 #   roles:
 #     - rpi_connect
 
+# Update /etc/hosts for HA cluster endpoint
+- import_playbook: hosts.yml
+
 # Phase 4 — k3s cluster (official k3s-io/k3s-ansible collection)
 - import_playbook: k3s.orchestration.site

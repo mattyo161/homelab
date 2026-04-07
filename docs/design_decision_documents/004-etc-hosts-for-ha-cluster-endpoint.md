@@ -106,8 +106,8 @@ IPs in this homelab are DHCP-assigned. Using `ansible.builtin.setup` to gather t
 
 Key implementation decisions:
 
-- `**blockinfile` over `lineinfile`:** Atomically replaces the entire block in a single write. No window where some entries are present and others are missing.
-- `**delegate_to` + `delegate_facts: true` + `run_once: true` for fact gathering:** When `--limit mou-pi5` is used, `gather_facts: true` on the play would only gather facts for `mou-pi5`. By explicitly delegating `setup` to each server and storing results with `delegate_facts: true`, server IPs are available in `hostvars` regardless of the `--limit` on the invoking play. `run_once: true` prevents the delegation loop from being executed once per target host.
+- **`blockinfile` over `lineinfile`:** Atomically replaces the entire block in a single write. No window where some entries are present and others are missing.
+- **`delegate_to` + `delegate_facts: true` + `run_once: true` for fact gathering:** When `--limit mou-pi5` is used, `gather_facts: true` on the play would only gather facts for `mou-pi5`. By explicitly delegating `setup` to each server and storing results with `delegate_facts: true`, server IPs are available in `hostvars` regardless of the `--limit` on the invoking play. `run_once: true` prevents the delegation loop from being executed once per target host.
 - **`api_endpoint` as marker key:** The `blockinfile` marker includes `api_endpoint`, so if the cluster endpoint hostname ever changes, the old block is cleanly replaced rather than accumulating stale entries.
 - **Separate playbook (not part of `site.yml`):** Allows targeted re-runs (`--limit`) for testing on a single node, and makes it easy to add or refresh entries after IP changes without re-running the full site playbook.
 

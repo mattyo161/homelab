@@ -83,21 +83,26 @@ If etcd still lists **dead** control-plane members after reinstall attempts, see
 1. Ensure **Vault** is unlocked and **`token`** / **`api_endpoint`** / **`k3s_version`** are correct.
 2. Run the **site** playbook for the **server** group (or full cluster), **without** tearing down the first node.
 
-   **Option A — only the nodes you reset:**
-
-   ```bash
-   ansible-playbook -i inventory/hosts.yml site.yml \
-     --limit 'mou-mini2,mou-pc1' \
-     --ask-vault-pass
-   ```
-
-   **Option B — all control-plane hosts** (idempotent on healthy nodes):
+   **Option A — all control-plane hosts (recommended, idempotent on healthy nodes):**
 
    ```bash
    ansible-playbook -i inventory/hosts.yml site.yml \
      --limit 'server' \
      --ask-vault-pass
    ```
+
+   **Option B — only the nodes you reset, but always include the first server:**
+
+   ```bash
+   ansible-playbook -i inventory/hosts.yml site.yml \
+     --limit 'mou-mini1,mou-mini2,mou-pc1' \
+     --ask-vault-pass
+   ```
+
+   > **Why the first server must be included:**
+   > When `token` is not in vault, the join token is read from `/var/lib/rancher/k3s/server/token` on `groups['server'][0]` (mou-mini1) and stored as `random_token` in Ansible's in-memory `hostvars` via `set_fact`. This fact only exists if mou-mini1 **actually ran** in the same play. `hostvars` always contains all inventory hosts, but `random_token` is **never persisted** — it is created at runtime only. If you run `--limit mou-mini2` alone (without mou-mini1), mou-mini1's `random_token` is undefined, the joiner gets no token in `config.yaml`, k3s generates a new random secret at startup, and the node cannot join the existing cluster.
+   >
+   > **Safest rule:** always use `--limit server` (the full group) or explicitly include `groups['server'][0]` in the limit whenever provisioning or re-provisioning joiner servers without an explicit `token` in vault.
 
 3. Confirm join from the **first** server:
 

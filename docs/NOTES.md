@@ -86,6 +86,26 @@ Running log of questions, answers, and practices that come up while building thi
 - **Fix:** move all vars to `inventory/group_vars/` and `inventory/host_vars/`. Inventory-adjacent vars travel with the inventory file regardless of which playbook (including collection-imported ones) is running.
 - A file named `group_vars/secrets.yml` (no group subdirectory) is **not** a global secrets file — it applies only to a group literally named `secrets`. Use `group_vars/k3s_cluster/secrets.yml` or `group_vars/all.yml` instead.
 
+## `--limit` and HA server joins: always include the first server
+
+When `token` is **not** in vault, the cluster join token is read from `/var/lib/rancher/k3s/server/token` on `groups['server'][0]` (the first inventory server) and stored as `random_token` via `set_fact` — an **in-memory-only** fact that exists only for the duration of that Ansible run.
+
+Joiner servers (any server that is not `groups['server'][0]`) retrieve it via:
+
+```jinja
+hostvars[groups[server_group][0]].random_token
+```
+
+**`hostvars` always contains all inventory hosts** regardless of `--limit`. But `random_token` is a `set_fact` — it is only present if the first server **actually executed tasks** during this run. If you run `--limit mou-mini2` alone, mou-mini1 never runs, `random_token` is never set, the `when:` condition on the joiner is false, no token goes into `config.yaml`, and k3s generates a fresh random secret — creating a new one-node cluster instead of joining the existing one.
+
+**Rules:**
+
+- When adding or re-provisioning joiner servers **without** `token` in vault: always use `--limit server` (full group) or explicitly include `groups['server'][0]` in `--limit`.
+- When `token` is in vault: `--limit` to individual joiners is safe because the vault-decrypted token is available on every host without needing a runtime `set_fact` from the first server.
+- `random_token` is not persisted anywhere. It cannot be looked up after the run that created it. If you want stable, independently-runnable joins, keep `token` in vault.
+
+See also: [k3s-control-plane-reset runbook](runbooks/k3s-control-plane-reset.md) (re-join section).
+
 ## k3s-ansible collection
 
 - Playbook FQCN: `**k3s.orchestration.site**`; upgrade: `**k3s.orchestration.upgrade**`.

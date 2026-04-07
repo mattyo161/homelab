@@ -1,12 +1,29 @@
 ---
 # Variables for k3s.orchestration (k3s-io/k3s-ansible).
-# Required secret `token` — see secrets.yml.example and README.md.
 
-k3s_version: v1.31.12+k3s1
+# Try to use the latest previous release of k3s
+k3s_version: v1.34.6+k3s1
 
-# API endpoint agents (and kubectl) use to reach the Kubernetes API.
-# First server hostname/IP; for stricter HA, point at a stable DNS/VIP in front of all servers.
-api_endpoint: "{{ hostvars[groups['server'][0]]['ansible_host'] | default(groups['server'][0]) }}"
+# The token should be a random string of reasonable length. You can generate
+# one with the following commands:
+# - openssl rand -base64 64
+# - pwgen -s 64 1
+# You can use ansible-vault to encrypt this value / keep it secret.
+# Or you can omit it if not using Vagrant and let the first server automatically generate one.
+# token: "changeme!"
 
-# Merged into ~/.kube/config on the Ansible controller after install.
+# Use an endpoint that is reachable from the agents and the Ansible controller
+# If this is HA setup then the endpoint should be a load balancer or a stable DNS name
+# that resolves to all of the control plane nodes.
+api_endpoint: "cluster.oue.home"
+
+# lets be explicit about the kubeconfig details
+# NOTE: don't change this unless you know what you are doing, the file will be merged 
+# into your ~/.kube/config automatically when set to this default name
+kubeconfig: ~/.kube/config.new
+# when true, the ansible_user on the contorller nodes will have kubeconfig setup, 
+# and won't require sudo to run kubectl
+user_kubectl: false
+# Set this to the context name you want to use for this cluster
 cluster_context: k3s-ansible
+

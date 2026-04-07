@@ -1,0 +1,27 @@
+# Longhorn Helm values
+# Chart: longhorn/longhorn
+# Repo: https://charts.longhorn.io
+#
+# Longhorn provides replicated block storage across cluster nodes.
+# Prerequisite: open-iscsi must be installed on all nodes (handled by apps.yml).
+
+defaultSettings:
+  # Number of replicas for each volume — 2 is a good balance for a 3-server cluster
+  defaultReplicaCount: 2
+  # Store data on the default path
+  defaultDataPath: /var/lib/longhorn
+
+# Ingress for the Longhorn UI
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  host: longhorn.oue.home
+  tls: true
+  tlsSecret: longhorn-tls
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+
+# Resource limits
+longhornManager:
+  tolerations: []

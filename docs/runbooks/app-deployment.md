@@ -21,8 +21,15 @@ brew install helm
 # ArgoCD CLI
 brew install argocd
 
-# kubernetes.core Ansible collection
+# Ansible Galaxy collections (kubernetes.core, k3s.orchestration, etc.)
 ansible-galaxy collection install -r ansible/collections/requirements.yml
+
+# Python kubernetes client — required by kubernetes.core modules at runtime
+# (separate from the collection install — must be in Ansible's Python environment)
+pip install -r ansible/requirements.txt
+
+# If using mise-managed Ansible:
+mise exec ansible -- pip install -r ansible/requirements.txt
 
 # Verify kubectl is configured correctly
 kubectl cluster-info

@@ -27,3 +27,7 @@ user_kubectl: false
 # Set this to the context name you want to use for this cluster
 cluster_context: k3s-ansible
 
+# Base path under which DATA partitions are mounted by the storage role.
+# Each discovered DATA* partition gets a subdirectory: /mnt/data/DATA1, /mnt/data/DATA2 etc.
+storage_data_mount_base: /mnt/data
+

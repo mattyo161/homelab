@@ -24,13 +24,13 @@
   roles:
     - common
 
-# Phase 2 — USB drive storage setup on all nodes
-# - name: Storage setup
-#   hosts: k3s_cluster
-#   become: true
-#   tags: storage
-#   roles:
-#     - storage
+# Phase 2 — Storage setup: discover and mount DATA partitions on all nodes
+- name: Storage setup
+  hosts: k3s_cluster
+  become: true
+  tags: storage
+  roles:
+    - storage
 
 # Phase 3 — rpi-connect on all nodes
 # - name: rpi-connect setup

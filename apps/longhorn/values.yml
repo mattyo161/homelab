@@ -8,8 +8,10 @@
 defaultSettings:
   # Number of replicas for each volume — 2 is a good balance for a 3-server cluster
   defaultReplicaCount: 2
-  # Store data on the default path
-  defaultDataPath: /var/lib/longhorn
+  # Use the DATA1 mount point created by the storage role on each node.
+  # Nodes without a DATA1 mount fall back to the Longhorn default (/var/lib/longhorn).
+  # The storage role mounts DATA partitions at /mnt/data/<LABEL> on each node.
+  defaultDataPath: /mnt/data/DATA1
 
 # Ingress for the Longhorn UI
 ingress:

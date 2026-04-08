@@ -1,0 +1,26 @@
+# Python dependencies for the Ansible controller
+# Ansible itself and all supporting libraries live here so a single
+# `mise run deps` sets up the entire environment from scratch.
+#
+# Uses ~= (compatible release) — allows patch updates within the pinned minor
+# version but blocks minor and major bumps (e.g. ~=13.5 means >=13.5, <14.0).
+#
+# Install (recommended — mise activates .venv automatically):
+#   mise run deps
+#
+# Or manually:
+#   pip install -r ansible/requirements.txt
+#   ansible-galaxy collection install -r ansible/collections/requirements.yml
+
+# Ansible itself — pinned to the same minor as the previous mise ansible plugin version
+ansible~=13.5
+
+# Kubernetes Python client — required by kubernetes.core.helm, kubernetes.core.k8s,
+# and kubernetes.core.k8s_info modules
+kubernetes~=35.0
+
+# YAML support (usually present, listed for completeness)
+PyYAML~=6.0
+
+# JSON patch support — required by some kubernetes.core operations
+jsonpatch~=1.33

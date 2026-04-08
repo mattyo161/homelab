@@ -8,16 +8,6 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  source:
-    repoURL: https://prometheus-community.github.io/helm-charts
-    chart: kube-prometheus-stack
-    # Pin the chart version — update here to upgrade
-    targetRevision: "69.2.0"
-    helm:
-      releaseName: prometheus-stack
-      valueFiles:
-        - $values/apps/prometheus-stack/values.yml
-  # Second source provides the values file from this repo
   sources:
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack
@@ -27,7 +17,7 @@ spec:
         valueFiles:
           - $values/apps/prometheus-stack/values.yml
     - repoURL: https://github.com/mattyo161/homelab.git
-      targetRevision: HEAD
+      targetRevision: ansible-k8s-core
       ref: values
   destination:
     server: https://kubernetes.default.svc

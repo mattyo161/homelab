@@ -56,7 +56,7 @@
   gather_facts: false
   vars:
     apps_dir: "{{ playbook_dir }}/../apps"
-    kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default(ansible_env.HOME + '/.kube/config', true) }}"
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default(lookup('env', 'HOME') + '/.kube/config', true) }}"
     metallb_ip_range: "192.168.5.200-192.168.5.210"
     traefik_ip: "192.168.5.200"
     domain: "oue.home"

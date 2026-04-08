@@ -6,6 +6,7 @@ server:
   ingress:
     enabled: true
     ingressClassName: traefik
+    hostname: argocd.oue.home
     hosts:
       - argocd.oue.home
     tls:

@@ -16,8 +16,6 @@ server:
     annotations:
       cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
       traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    # ArgoCD serves its own TLS by default — tell it to expect a TLS termination upstream
-    # so it doesn't try to do double-TLS with Traefik
     https: false
 
   # Disable internal TLS so Traefik can terminate it cleanly
@@ -43,3 +41,6 @@ configs:
   params:
     # Tell ArgoCD it's behind a reverse proxy
     server.insecure: "true"
+  cm:
+    # Base URL used for redirect URIs, logout, and SSO callbacks
+    url: "https://argocd.oue.home"

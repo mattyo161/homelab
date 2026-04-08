@@ -6,7 +6,7 @@ Provisions a k3s homelab cluster with control-plane (`server`) and worker (`agen
 
 ## Prerequisites
 
-- **Ansible 8+** (ansible-core **2.15+**) on the machine that runs playbooks
+- **[mise](https://mise.jdx.dev/)** on your control machine — manages Python, Helm, and kubectl versions and creates the project `.venv/` (see [docs/SETUP.md](../docs/SETUP.md) for the full bootstrap sequence)
 - SSH key-based access to all nodes
 - **Passwordless sudo** (or equivalent) for the Ansible user on targets — see `bootstrap-sudo.yaml` / `bootstrap-user-ansible.yaml`
 - Raspberry Pi OS Lite 64-bit, Ubuntu Server, or other OSes supported by [k3s-io/k3s-ansible](https://github.com/k3s-io/k3s-ansible)
@@ -16,15 +16,25 @@ Provisions a k3s homelab cluster with control-plane (`server`) and worker (`agen
 
 Cluster install uses the official **`k3s.orchestration`** collection ([k3s-io/k3s-ansible](https://github.com/k3s-io/k3s-ansible)), not the legacy `roles/k3s*`.
 
-### Install collections
+### Install collections and Python dependencies
 
-From the `ansible/` directory:
+The recommended approach uses [mise](https://mise.jdx.dev/) from the **repo root**:
 
 ```bash
+mise install     # installs pinned python, helm, kubectl
+mise run deps    # installs ansible + Python deps into .venv/, then Ansible collections
+```
+
+`mise` creates a project-local `.venv/` and activates it automatically (requires `mise activate` in your shell profile). After that, `ansible-playbook` and all other tools resolve to the correct versions without manual PATH management.
+
+To run steps individually from the `ansible/` directory:
+
+```bash
+pip install -r requirements.txt
 ansible-galaxy collection install -r collections/requirements.yml
 ```
 
-This pulls `k3s.orchestration` (pinned to `v1.2.0` in `collections/requirements.yml`) and its dependencies (`community.general`, `ansible.posix`).
+`requirements.txt` installs `ansible` itself along with the Python `kubernetes` client and supporting libraries — all in the same `.venv/` interpreter that `ansible-playbook` uses at runtime. `collections/requirements.yml` pulls `k3s.orchestration`, `kubernetes.core`, `community.general`, and `ansible.posix`.
 
 ### Cluster token and secrets
 

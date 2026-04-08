@@ -271,6 +271,19 @@
         wait: true
         timeout: "10m0s"
 
+    - name: Remove default annotation from local-path StorageClass
+      tags: longhorn
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+        name: local-path
+        definition:
+          metadata:
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "false"
+        state: present
+
     # ------------------------------------------------------------------ #
     # ArgoCD
     # ------------------------------------------------------------------ #

@@ -1,6 +1,6 @@
 # Headlamp Helm values
 # Chart: headlamp/headlamp
-# Repo: https://headlamp-k8s.github.io/headlamp/
+# Repo: https://kubernetes-sigs.github.io/headlamp/
 #
 # Headlamp is a lightweight Kubernetes dashboard with a clean UI and plugin support.
 

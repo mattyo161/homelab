@@ -341,6 +341,35 @@ ansible-config list | grep -A5 collections_path
 ansible-config dump | grep collection
 ```
 
+### Ansible Facts Extraction
+
+```shell
+# get hostvars and other details from ansible
+ansible-playbook debug-vars.yml
+
+# Use saved ansibe-debug information hostvars to extract all the volumes matching certain criteria
+cat ansible-debug/hostvars.json \
+| jq -rc 'to_entries[] | .value |
+  {
+    ansible_host,
+    inventory_hostname,
+    ips:(.ansible_facts.all_ipv4_addresses)
+  } + (
+    # find all of the devices that have partitions with label starting with data
+    .ansible_facts.devices[].partitions[] |
+      select(.links.labels[] | test("^DATA"))
+  )'
+```
+
+Result in JSON Line
+```json    
+{"ansible_host":"mou-mini1.oue.home","inventory_hostname":"mou-mini1","ips":["10.42.0.1","192.168.5.165","10.42.0.0"],"holders":[],"links":{"ids":["ata-HP_SSD_S700_500GB_HBSA39261001500-part13","scsi-0ATA_HP_SSD_S700_500G_HBSA39261001500-part13","scsi-1ATA_HP_SSD_S700_500GB_HBSA39261001500-part13","scsi-SATA_HP_SSD_S700_500G_HBSA39261001500-part13"],"labels":["DATA"],"masters":[],"uuids":["9AE9-739C"]},"sectors":163840000,"sectorsize":512,"size":"78.12 GB","start":"543041536","uuid":"9AE9-739C"}
+{"ansible_host":"mou-mini5.oue.home","inventory_hostname":"mou-mini5","ips":["192.168.5.169"],"holders":[],"links":{"ids":["ata-APPLE_HDD_HTS541010A9E662_JD8002D81K2ALD-part7","scsi-0ATA_APPLE_HDD_HTS541_JD8002D81K2ALD-part7","scsi-1ATA_APPLE_HDD_HTS541010A9E662_JD8002D81K2ALD-part7","scsi-35000cca82ad5da9a-part7","scsi-SATA_APPLE_HDD_HTS541_JD8002D81K2ALD-part7","wwn-0x5000cca82ad5da9a-part7"],"labels":["DATA1"],"masters":[],"uuids":["6FD7-887B"]},"sectors":409600000,"sectorsize":512,"size":"195.31 GB","start":"525561856","uuid":"6FD7-887B"}
+{"ansible_host":"mou-mini5.oue.home","inventory_hostname":"mou-mini5","ips":["192.168.5.169"],"holders":[],"links":{"ids":["ata-APPLE_HDD_HTS541010A9E662_JD8002D81K2ALD-part8","scsi-0ATA_APPLE_HDD_HTS541_JD8002D81K2ALD-part8","scsi-1ATA_APPLE_HDD_HTS541010A9E662_JD8002D81K2ALD-part8","scsi-35000cca82ad5da9a-part8","scsi-SATA_APPLE_HDD_HTS541_JD8002D81K2ALD-part8","wwn-0x5000cca82ad5da9a-part8"],"labels":["DATA2"],"masters":[],"uuids":["7DFE-C893"]},"sectors":409600000,"sectorsize":512,"size":"195.31 GB","start":"935161856","uuid":"7DFE-C893"}
+{"ansible_host":"mou-mini5.oue.home","inventory_hostname":"mou-mini5","ips":["192.168.5.169"],"holders":[],"links":{"ids":["ata-APPLE_HDD_HTS541010A9E662_JD8002D81K2ALD-part9","scsi-0ATA_APPLE_HDD_HTS541_JD8002D81K2ALD-part9","scsi-1ATA_APPLE_HDD_HTS541010A9E662_JD8002D81K2ALD-part9","scsi-35000cca82ad5da9a-part9","scsi-SATA_APPLE_HDD_HTS541_JD8002D81K2ALD-part9","wwn-0x5000cca82ad5da9a-part9"],"labels":["DATA3"],"masters":[],"uuids":["E9FD-A8AF"]},"sectors":608761856,"sectorsize":512,"size":"290.28 GB","start":"1344761856","uuid":"E9FD-A8AF"}
+{"ansible_host":"mou-pc1.oue.home","inventory_hostname":"mou-pc1","ips":["192.168.5.151"],"holders":[],"links":{"ids":["nvme-PCIe_SSD_20011625601646-part6","nvme-PCIe_SSD_20011625601646_1-part6","nvme-nvme.1987-3230303131363235363031363436-5043496520535344-00000001-part6"],"labels":["DATA1"],"masters":[],"uuids":["67bd1b0f-e10d-4f84-b11a-97b514509a68"]},"sectors":160927744,"sectorsize":512,"size":"76.74 GB","start":"339189760","uuid":"67bd1b0f-e10d-4f84-b11a-97b514509a68"}
+```
+
 ---
 
 ## Git
@@ -366,3 +395,4 @@ git -C ~/Projects/k8/k3s-ansible log --oneline -10
 - [ansible-variable-scopes-and-playbook-relativity runbook](ansible-variable-scopes-and-playbook-relativity.md)
 - [ansible-local-collection-development runbook](ansible-local-collection-development.md)
 - [DDD 004 — /etc/hosts for HA cluster endpoint](../design_decision_documents/004-etc-hosts-for-ha-cluster-endpoint.md)
+

@@ -1,0 +1,12 @@
+# cert-manager Helm values
+# Chart: jetstack/cert-manager
+# Repo: https://charts.jetstack.io
+#
+# crds.enabled installs the CRDs as part of the Helm release so they are managed
+# alongside the chart version. This is the recommended approach for new installs.
+
+crds:
+  enabled: true
+
+# Replicas — 1 is fine for homelab, bump to 2+ for HA
+replicaCount: 1

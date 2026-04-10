@@ -27,3 +27,15 @@ user_kubectl: false
 # Set this to the context name you want to use for this cluster
 cluster_context: k3s-ansible
 
+# Disable k3s built-in Traefik so the Helm-managed Traefik (with MetalLB) takes over.
+# Uses server_config_yaml (not k3s_server_config) — the collection initializes
+# k3s_server_config as an empty set_fact, overwriting any group_var with that name.
+# server_config_yaml is merged in afterwards via `combine(server_config_yaml | from_yaml)`.
+server_config_yaml: |
+  disable:
+    - traefik
+
+# Base path under which DATA partitions are mounted by the storage role.
+# Each discovered DATA* partition gets a subdirectory: /mnt/data/DATA1, /mnt/data/DATA2 etc.
+storage_data_mount_base: /mnt/data
+

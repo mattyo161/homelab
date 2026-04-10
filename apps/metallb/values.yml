@@ -1,0 +1,10 @@
+# MetalLB Helm values
+# Chart: metallb/metallb
+# Repo: https://metallb.github.io/metallb
+#
+# MetalLB watches for Services of type LoadBalancer and assigns IPs from the
+# configured address pool. The IPAddressPool and L2Advertisement resources are
+# created as a post-install step in apps.yml (they require the CRDs to exist first).
+#
+# No Helm values overrides needed for the base chart — all configuration is done
+# via CRs (IPAddressPool, L2Advertisement) in apps.yml.

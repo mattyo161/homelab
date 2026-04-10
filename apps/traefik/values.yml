@@ -1,0 +1,75 @@
+# Traefik Helm values
+# Chart: traefik/traefik
+# Repo: https://traefik.github.io/charts
+#
+# Targets Traefik v3 chart. The v3 schema moved HTTP->HTTPS redirections out of
+# ports.web.redirections into a dedicated `redirectTo` key, and TLS config out of
+# ports.websecure.tls into the entrypoints section.
+#
+# IMPORTANT: Before running apps.yml, disable the built-in Traefik by adding to
+# k3s server config (managed via server_config_yaml in group_vars):
+#   disable: ["traefik"]
+# Then re-run site.yml to apply, before running apps.yml.
+# See apps/traefik/README.md for the migration steps.
+
+# Use the MetalLB-assigned IP for the LoadBalancer service
+service:
+  type: LoadBalancer
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.5.200"
+
+# Expose ports
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+  traefik:
+    port: 9000
+    expose:
+      default: false
+
+# Enable dashboard (secured by IngressRoute in apps.yml)
+ingressRoute:
+  dashboard:
+    enabled: false
+
+# Cert-manager integration — allow Traefik to read TLS secrets across namespaces
+providers:
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: true
+    allowExternalNameServices: true
+  kubernetesIngress:
+    enabled: true
+    allowExternalNameServices: true
+    publishedService:
+      enabled: true
+
+# Logging
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+
+# Resource limits — conservative for homelab
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

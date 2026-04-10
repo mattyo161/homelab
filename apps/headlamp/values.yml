@@ -1,0 +1,34 @@
+# Headlamp Helm values
+# Chart: headlamp/headlamp
+# Repo: https://kubernetes-sigs.github.io/headlamp/
+#
+# Headlamp is a lightweight Kubernetes dashboard with a clean UI and plugin support.
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: headlamp.oue.home
+      paths:
+        - path: /
+          type: Prefix
+  tls:
+    - secretName: headlamp-tls
+      hosts:
+        - headlamp.oue.home
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+
+# Headlamp runs in-cluster mode — uses the cluster's ServiceAccount for API access
+# Users authenticate with a ServiceAccount token (see runbook for token generation)
+config:
+  inCluster: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

@@ -1,0 +1,28 @@
+---
+description: Markdown formatting conventions for this project
+globs: **/*.md
+alwaysApply: false
+---
+
+# Markdown formatting
+
+When writing or editing `.md` files in this project:
+
+- **Do not wrap prose at 80–100 characters.** Write each sentence or logical thought as a single continuous line. Let the editor wrap visually.
+- Tables, code blocks, and YAML/list items are exempt — those keep natural line breaks.
+- This applies to all docs: runbooks, DDDs, NOTES.md, README files, etc.
+
+## Example
+
+❌ BAD — hard-wrapped prose:
+```
+The k3s agent uses an internal load balancer proxy on 127.0.0.1:6444.
+All agent traffic goes through this proxy first. The proxy dials the
+real cluster endpoint. If the proxy can't reach the cluster, it resets
+incoming connections.
+```
+
+✅ GOOD — continuous lines:
+```
+The k3s agent uses an internal load balancer proxy on 127.0.0.1:6444. All agent traffic goes through this proxy first. The proxy dials the real cluster endpoint. If the proxy can't reach the cluster, it resets incoming connections — producing the misleading `connection reset by peer` on `127.0.0.1:6444`.
+```

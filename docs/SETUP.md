@@ -12,9 +12,37 @@ Chronological steps to reproduce this environment from a cold start. Adjust host
 
 ## 1. Prerequisites on your control machine
 
-1. Install **Ansible 8+** (ansible-core **2.15+**).
-2. Clone this repository and work from **`ansible/`** for all commands below.
+This repo uses [mise](https://mise.jdx.dev/) to pin all tool versions and manage the Python virtual environment. It is the recommended (and tested) way to get a consistent environment.
+
+1. Install **mise**: https://mise.jdx.dev/getting-started.html
+
+   Ensure `mise activate` is in your shell profile (the installer usually adds this). For zsh it should look like:
+
+   ```bash
+   eval "$(mise activate zsh)"
+   ```
+
+   This is what makes mise automatically activate the project `.venv/` when you `cd` into the repo. If it is not set up, run `. ~/.zshrc` after any change or use `exec zsh` to reload.
+
+2. Clone this repository, then from the repo root:
+
+   ```bash
+   mise install           # installs pinned python, helm, kubectl
+   mise run deps          # creates .venv, installs ansible + all Python deps, installs Ansible collections
+   ```
+
+   After that, `python`, `pip`, `ansible-playbook`, `helm`, and `kubectl` all resolve to `.venv/bin/` or the mise-managed versions — no manual PATH management needed. Verify with `which pip && which ansible`.
+
 3. Ensure **SSH key-based** access to every node as the user you will use for automation (e.g. `matt`).
+
+### What `mise run deps` does
+
+- Runs `pip install -r ansible/requirements.txt` into the project `.venv/` — installs `ansible`, the `kubernetes` Python client, and supporting libraries.
+- Runs `ansible-galaxy collection install -r ansible/collections/requirements.yml` — installs `k3s.orchestration`, `kubernetes.core`, and other required collections.
+
+### Why not install ansible globally?
+
+`ansible` is managed as a pip package inside the project `.venv/` rather than using the mise `ansible` plugin. This keeps `ansible`, `kubernetes` (the Python client required by `kubernetes.core` modules), and all other Python dependencies in the same interpreter — no venv path gymnastics required. See `.mise.toml` and `ansible/requirements.txt` for pinned versions.
 
 ## 2. Node prerequisites (each host)
 
@@ -77,14 +105,23 @@ Then point inventory at `ansible_user: ansible` and the matching private key. Se
 
 4. `secrets.yml` is **gitignored**; do not commit plaintext tokens.
 
-## 7. Install Ansible collections
+## 7. Install Ansible collections and Python dependencies
+
+If you followed step 1 and ran `mise run deps`, this is already done. To re-run manually:
 
 ```bash
-cd ansible
+# From the repo root
+mise run deps
+```
+
+Or individually from the `ansible/` directory:
+
+```bash
+pip install -r requirements.txt
 ansible-galaxy collection install -r collections/requirements.yml
 ```
 
-This installs **`k3s.orchestration`** (pinned in `collections/requirements.yml`) and dependencies.
+This installs **`k3s.orchestration`**, **`kubernetes.core`**, and their dependencies, plus the `ansible`, `kubernetes`, `PyYAML`, and `jsonpatch` Python packages into `.venv/`.
 
 ## 8. Connectivity check
 

@@ -1,0 +1,95 @@
+# kube-prometheus-stack Helm values
+# Chart: prometheus-community/kube-prometheus-stack
+# Repo: https://prometheus-community.github.io/helm-charts
+#
+# Bundles: Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics,
+# and pre-built dashboards/alerting rules for Kubernetes.
+
+# --- Grafana ---
+grafana:
+  enabled: true
+  adminPassword: "changeme"   # override via ansible vault secret — see apps.yml
+
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - grafana.oue.home
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.oue.home
+    annotations:
+      cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+
+  persistence:
+    enabled: true
+    storageClassName: longhorn
+    size: 5Gi
+
+  # Default dashboards for Kubernetes
+  defaultDashboardsEnabled: true
+
+# --- Prometheus ---
+prometheus:
+  prometheusSpec:
+    # How long to retain metrics data
+    retention: 30d
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - prometheus.oue.home
+    tls:
+      - secretName: prometheus-tls
+        hosts:
+          - prometheus.oue.home
+    annotations:
+      cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+
+# --- Alertmanager ---
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+# --- Node exporter ---
+# Collects CPU/memory/disk metrics from every node
+nodeExporter:
+  enabled: true
+
+# --- kube-state-metrics ---
+# Exposes Kubernetes object state as metrics
+kubeStateMetrics:
+  enabled: true
+
+# --- Scrape k3s components ---
+# k3s bundles scheduler, controller-manager, and etcd — they need non-default ports
+kubeScheduler:
+  enabled: true
+  endpoints: []   # auto-discovered via service discovery
+
+kubeControllerManager:
+  enabled: true
+
+kubeEtcd:
+  enabled: true
+  endpoints: []   # auto-discovered

@@ -8,4 +8,8 @@ collections:
 
   - name: https://github.com/mattyo161/k3s-ansible.git
     type: git
-    version: fix-token-initialization
+    version: mou-latest
+
+  # Helm and Kubernetes module support for apps.yml
+  - name: kubernetes.core
+    version: ">=3.0.0"

@@ -1,0 +1,35 @@
+---
+# Rolling restart of k3s server nodes — one at a time.
+# Waits for the node to rejoin the cluster and reach Ready state before
+# moving to the next, preserving HA quorum throughout.
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.yml rolling-restart-servers.yml
+#   ansible-playbook -i inventory/hosts.yml rolling-restart-servers.yml --limit mou-mini1
+
+- name: Rolling restart of k3s server nodes
+  hosts: server
+  become: true
+  serial: 1  # one node at a time
+
+  tasks:
+    - name: Restart k3s service
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted
+
+    - name: Wait for k3s API to be reachable on this node
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 6443
+        timeout: 120
+
+    - name: Wait for node to be Ready in the cluster
+      ansible.builtin.command:
+        cmd: kubectl get node {{ inventory_hostname }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+      delegate_to: localhost
+      become: false
+      register: node_ready
+      until: node_ready.stdout == "True"
+      retries: 20
+      delay: 10

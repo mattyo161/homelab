@@ -1,0 +1,46 @@
+# ArgoCD Helm values
+# Chart: argo/argo-cd
+# Repo: https://argoproj.github.io/argo-helm
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hostname: argocd.oue.home
+    hosts:
+      - argocd.oue.home
+    tls:
+      - secretName: argocd-tls
+        hosts:
+          - argocd.oue.home
+    annotations:
+      cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    https: false
+
+  # Disable internal TLS so Traefik can terminate it cleanly
+  extraArgs:
+    - --insecure
+
+# Use reduced replicas for homelab
+replicaCount: 1
+
+# Application controller
+controller:
+  replicas: 1
+
+# Redis for caching — single replica is fine for homelab
+redis:
+  enabled: true
+
+# Disable dex (SSO) for simplicity — use local admin account
+dex:
+  enabled: false
+
+configs:
+  params:
+    # Tell ArgoCD it's behind a reverse proxy
+    server.insecure: "true"
+  cm:
+    # Base URL used for redirect URIs, logout, and SSO callbacks
+    url: "https://argocd.oue.home"

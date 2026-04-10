@@ -1,0 +1,369 @@
+---
+# apps.yml
+# Bootstraps the infrastructure layer and ArgoCD on the k3s cluster.
+# After this runs, ArgoCD manages all application deployments via git (App of Apps).
+#
+# What this playbook installs (once, and idempotently):
+#   Infrastructure layer (Ansible-managed, no ArgoCD):
+#     1. MetalLB         — LoadBalancer IP assignment (192.168.5.200-210)
+#     2. cert-manager    — TLS certificate issuance (self-signed CA)
+#     3. Traefik         — ingress controller (replaces built-in k3s Traefik)
+#     4. Longhorn        — distributed block storage
+#   ArgoCD bootstrap (Ansible installs once, ArgoCD manages itself thereafter):
+#     5. ArgoCD          — GitOps controller
+#     6. App of Apps     — root ArgoCD Application pointing at apps/argocd/apps/
+#
+# After this runs, to deploy or update applications:
+#   - Edit apps/argocd/apps/<app>.yml or apps/<app>/values.yml
+#   - Push to git
+#   - ArgoCD syncs automatically (or use: argocd app sync <name>)
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.yml apps.yml
+#   ansible-playbook -i inventory/hosts.yml apps.yml --tags metallb
+#   ansible-playbook -i inventory/hosts.yml apps.yml --tags argocd
+#   ansible-playbook -i inventory/hosts.yml apps.yml --check --diff
+#
+# Prerequisites:
+#   brew install helm argocd
+#   ansible-galaxy collection install -r collections/requirements.yml
+#
+# IMPORTANT: Before first run, disable built-in Traefik in k3s_server_config:
+#   k3s_server_config:
+#     disable:
+#       - traefik
+#   Then: ansible-playbook -i inventory/hosts.yml site.yml
+
+- name: Install prerequisites on cluster nodes (open-iscsi for Longhorn)
+  hosts: k3s_cluster
+  become: true
+  tags: [longhorn, prereqs]
+  tasks:
+    - name: Install open-iscsi
+      ansible.builtin.package:
+        name: open-iscsi
+        state: present
+
+    - name: Enable and start iscsid
+      ansible.builtin.systemd:
+        name: iscsid
+        enabled: true
+        state: started
+
+- name: Bootstrap infrastructure and ArgoCD
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    apps_dir: "{{ playbook_dir }}/../apps"
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default(lookup('env', 'HOME') + '/.kube/config', true) }}"
+    metallb_ip_range: "192.168.5.200-192.168.5.210"
+    traefik_ip: "192.168.5.200"
+    domain: "oue.home"
+
+  tasks:
+    # ------------------------------------------------------------------ #
+    # Namespaces
+    # ------------------------------------------------------------------ #
+    - name: Create infrastructure namespaces
+      tags: [always, namespaces]
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ item }}"
+      loop:
+        - metallb-system
+        - cert-manager
+        - traefik
+        - longhorn-system
+        - argocd
+
+    # ------------------------------------------------------------------ #
+    # MetalLB
+    # ------------------------------------------------------------------ #
+    - name: Add MetalLB Helm repo
+      tags: metallb
+      kubernetes.core.helm_repository:
+        name: metallb
+        repo_url: https://metallb.github.io/metallb
+
+    - name: Install / upgrade MetalLB
+      tags: metallb
+      kubernetes.core.helm:
+        kubeconfig: "{{ kubeconfig }}"
+        name: metallb
+        chart_ref: metallb/metallb
+        release_namespace: metallb-system
+        values_files:
+          - "{{ apps_dir }}/metallb/values.yml"
+        wait: true
+        timeout: "5m0s"
+
+    - name: Wait for MetalLB webhook to be ready
+      tags: metallb
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        kind: Deployment
+        name: metallb-webhook-server
+        namespace: metallb-system
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 120
+
+    - name: Configure MetalLB IP address pool
+      tags: metallb
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: metallb.io/v1beta1
+          kind: IPAddressPool
+          metadata:
+            name: homelab-pool
+            namespace: metallb-system
+          spec:
+            addresses:
+              - "{{ metallb_ip_range }}"
+
+    - name: Configure MetalLB L2 advertisement
+      tags: metallb
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: metallb.io/v1beta1
+          kind: L2Advertisement
+          metadata:
+            name: homelab-l2advert
+            namespace: metallb-system
+          spec:
+            ipAddressPools:
+              - homelab-pool
+
+    # ------------------------------------------------------------------ #
+    # cert-manager
+    # ------------------------------------------------------------------ #
+    - name: Add Jetstack Helm repo
+      tags: cert-manager
+      kubernetes.core.helm_repository:
+        name: jetstack
+        repo_url: https://charts.jetstack.io
+
+    - name: Install / upgrade cert-manager
+      tags: cert-manager
+      kubernetes.core.helm:
+        kubeconfig: "{{ kubeconfig }}"
+        name: cert-manager
+        chart_ref: jetstack/cert-manager
+        release_namespace: cert-manager
+        values_files:
+          - "{{ apps_dir }}/cert-manager/values.yml"
+        wait: true
+        timeout: "5m0s"
+
+    - name: Wait for cert-manager webhook to be ready
+      tags: cert-manager
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        kind: Deployment
+        name: cert-manager-webhook
+        namespace: cert-manager
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 120
+
+    - name: Apply self-signed ClusterIssuer chain
+      tags: cert-manager
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        src: "{{ apps_dir }}/cert-manager/cluster-issuer.yml"
+
+    # ------------------------------------------------------------------ #
+    # Traefik
+    # ------------------------------------------------------------------ #
+    - name: Add Traefik Helm repo
+      tags: traefik
+      kubernetes.core.helm_repository:
+        name: traefik
+        repo_url: https://traefik.github.io/charts
+
+    - name: Install / upgrade Traefik
+      tags: traefik
+      kubernetes.core.helm:
+        kubeconfig: "{{ kubeconfig }}"
+        name: traefik
+        chart_ref: traefik/traefik
+        release_namespace: traefik
+        values_files:
+          - "{{ apps_dir }}/traefik/values.yml"
+        wait: true
+        timeout: "5m0s"
+
+    - name: Create Traefik dashboard Certificate
+      tags: traefik
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: traefik-dashboard-tls
+            namespace: traefik
+          spec:
+            secretName: traefik-dashboard-tls
+            issuerRef:
+              name: selfsigned-cluster-issuer
+              kind: ClusterIssuer
+            dnsNames:
+              - "traefik.{{ domain }}"
+
+    - name: Create Traefik dashboard IngressRoute
+      tags: traefik
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: traefik.io/v1alpha1
+          kind: IngressRoute
+          metadata:
+            name: traefik-dashboard
+            namespace: traefik
+          spec:
+            entryPoints:
+              - websecure
+            routes:
+              - match: "Host(`traefik.{{ domain }}`)"
+                kind: Rule
+                services:
+                  - name: api@internal
+                    kind: TraefikService
+            tls:
+              secretName: traefik-dashboard-tls
+
+    # ------------------------------------------------------------------ #
+    # Longhorn
+    # ------------------------------------------------------------------ #
+    - name: Add Longhorn Helm repo
+      tags: longhorn
+      kubernetes.core.helm_repository:
+        name: longhorn
+        repo_url: https://charts.longhorn.io
+
+    - name: Install / upgrade Longhorn
+      tags: longhorn
+      kubernetes.core.helm:
+        kubeconfig: "{{ kubeconfig }}"
+        name: longhorn
+        chart_ref: longhorn/longhorn
+        release_namespace: longhorn-system
+        values_files:
+          - "{{ apps_dir }}/longhorn/values.yml"
+        wait: true
+        timeout: "10m0s"
+
+    - name: Remove default annotation from local-path StorageClass
+      tags: longhorn
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+        name: local-path
+        definition:
+          metadata:
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "false"
+        state: present
+
+    # ------------------------------------------------------------------ #
+    # ArgoCD
+    # ------------------------------------------------------------------ #
+    - name: Add Argo Helm repo
+      tags: argocd
+      kubernetes.core.helm_repository:
+        name: argo
+        repo_url: https://argoproj.github.io/argo-helm
+
+    - name: Install / upgrade ArgoCD
+      tags: argocd
+      kubernetes.core.helm:
+        kubeconfig: "{{ kubeconfig }}"
+        name: argocd
+        chart_ref: argo/argo-cd
+        release_namespace: argocd
+        values_files:
+          - "{{ apps_dir }}/argocd/values.yml"
+        wait: true
+        timeout: "10m0s"
+
+    - name: Wait for ArgoCD server to be ready
+      tags: argocd
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        kind: Deployment
+        name: argocd-server
+        namespace: argocd
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 180
+
+    - name: Create ArgoCD Certificate for ingress
+      tags: argocd
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: argocd-tls
+            namespace: argocd
+          spec:
+            secretName: argocd-tls
+            issuerRef:
+              name: selfsigned-cluster-issuer
+              kind: ClusterIssuer
+            dnsNames:
+              - "argocd.{{ domain }}"
+
+    # ------------------------------------------------------------------ #
+    # App of Apps — ArgoCD now takes over from here
+    # ------------------------------------------------------------------ #
+    - name: Apply App of Apps root Application
+      tags: argocd
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        src: "{{ apps_dir }}/argocd/app-of-apps.yml"
+
+    - name: Get ArgoCD initial admin password
+      tags: argocd
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        kind: Secret
+        name: argocd-initial-admin-secret
+        namespace: argocd
+      register: argocd_secret
+
+    - name: Print ArgoCD access details
+      tags: argocd
+      ansible.builtin.debug:
+        msg: |
+          ArgoCD is ready at https://argocd.{{ domain }}
+          Username: admin
+          Password: {{ argocd_secret.resources[0].data.password | b64decode }}
+
+          Change the password after first login:
+            argocd login argocd.{{ domain }}
+            argocd account update-password

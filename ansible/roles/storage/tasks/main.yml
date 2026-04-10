@@ -1,104 +1,177 @@
-# ---
-# # roles/storage/tasks/main.yml
-# # Partition, format and mount USB drive
+---
+# roles/storage/tasks/main.yml
+# Discovers DATA* partitions on each node and mounts them persistently.
+#
+# Two discovery sources are combined:
+#
+# 1. ansible_facts (primary, no shell needed) — reads device_links filesystem labels
+#    set by mkfs -L. Covers:
+#      mou-mini1:  /dev/sda13       label=DATA    (vfat,  78 GB)
+#      mou-mini5:  /dev/sda7/8/9    label=DATA1/2/3 (exfat, 195/195/290 GB)
+#      mou-pc1:    /dev/nvme0n1p6   label=DATA1   (ext4,  77 GB)
+#
+# 2. blkid (supplemental) — finds GPT PARTLABEL entries that are NOT in ansible_facts
+#    because they are partition table labels, not filesystem labels. Covers:
+#      mou-mini4:  /dev/sda6/7/8    PARTLABEL=DATA1/2/3 (exfat, 195/195/287 GB)
+#
+# Both sources are merged; ansible_facts entries take precedence and blkid entries
+# are only added if their UUID is not already present from ansible_facts.
+# Nodes with no DATA partitions skip mount tasks gracefully.
+#
+# Mount points: {{ storage_data_mount_base }}/<LABEL>  e.g. /mnt/data/DATA1
+# Filesystem types are resolved by blkid for ansible_facts entries (which don't
+# include fstype — that requires a separate blkid call per device).
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.yml site.yml --tags storage
+#   ansible-playbook -i inventory/hosts.yml site.yml --tags storage --limit mou-pc1
 
-# - name: Check if USB device exists
-#   stat:
-#     path: "{{ usb_device }}"
-#   register: usb_stat
+# ------------------------------------------------------------------ #
+# Source 1: ansible_facts — FS labels (no shell needed)
+# ------------------------------------------------------------------ #
+- name: Build DATA partition list from ansible_facts device labels
+  ansible.builtin.set_fact:
+    data_partitions_from_facts: >-
+      {%- set result = [] -%}
+      {%- for dev_name, dev in ansible_facts.devices.items() -%}
+        {%- for part_name, part in dev.partitions.items() -%}
+          {%- for label in part.links.labels -%}
+            {%- if label is match('^DATA') -%}
+              {%- set uuid = part.links.uuids[0] if part.links.uuids else '' -%}
+              {%- if result.append({'device': '/dev/' + part_name, 'label': label, 'uuid': uuid, 'fstype': 'unknown'}) -%}{%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ result }}
 
-# - name: Fail if USB device not found
-#   fail:
-#     msg: "USB device {{ usb_device }} not found"
-#   when: not usb_stat.stat.exists
+# ------------------------------------------------------------------ #
+# Source 2: blkid — GPT PARTLABEL entries not visible in ansible_facts
+# ------------------------------------------------------------------ #
+- name: Discover GPT PARTLABEL DATA partitions via blkid
+  ansible.builtin.shell: |
+    blkid -o export | awk '
+      /^DEVNAME=/       { dev=substr($0, 8) }
+      /^PARTLABEL=DATA/ { label=substr($0, 11) }
+      /^UUID=/          { uuid=substr($0, 6) }
+      /^TYPE=/          { fstype=substr($0, 6) }
+      /^$/ {
+        if (label != "") {
+          print dev "," label "," uuid "," fstype
+          label=""
+        }
+      }
+      END { if (label != "") print dev "," label "," uuid "," fstype }
+    '
+  register: blkid_partlabel_output
+  changed_when: false
+  failed_when: false
 
-# - name: Check if already partitioned
-#   command: blkid {{ usb_device }}1
-#   register: partition_check
-#   ignore_errors: true
-#   changed_when: false
+- name: Add any PARTLABEL entries not already found via ansible_facts
+  ansible.builtin.set_fact:
+    data_partitions_from_blkid: >-
+      {%- set result = [] -%}
+      {%- set known_uuids = data_partitions_from_facts | map(attribute='uuid') | list -%}
+      {%- for line in blkid_partlabel_output.stdout_lines | reject('equalto', '') -%}
+        {%- set parts = line.split(',') -%}
+        {%- if parts | length == 4 and parts[2] not in known_uuids -%}
+          {%- if result.append({'device': parts[0], 'label': parts[1], 'uuid': parts[2], 'fstype': parts[3]}) -%}{%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ result }}
 
-# - name: Partition USB drive
-#   block:
-#     - name: Create partition table
-#       parted:
-#         device: "{{ usb_device }}"
-#         label: msdos
-#         state: present
+# ------------------------------------------------------------------ #
+# Resolve filesystem types for ansible_facts entries (fstype=unknown)
+# ------------------------------------------------------------------ #
+- name: Query fstype for partitions found via ansible_facts
+  ansible.builtin.command:
+    cmd: "blkid -s TYPE -o value {{ item.device }}"
+  register: blkid_fstype_results
+  changed_when: false
+  failed_when: false
+  loop: "{{ data_partitions_from_facts | selectattr('fstype', 'equalto', 'unknown') | list }}"
+  loop_control:
+    label: "{{ item.device }}"
 
-#     - name: Create k3s partition (20GB)
-#       parted:
-#         device: "{{ usb_device }}"
-#         number: 1
-#         state: present
-#         fs_type: ext4
-#         part_end: "{{ k3s_partition_size }}"
+- name: Build fstype lookup map
+  ansible.builtin.set_fact:
+    fstype_map: >-
+      {%- set result = {} -%}
+      {%- for r in blkid_fstype_results.results | default([]) -%}
+        {%- if result.update({r.item.device: r.stdout | trim}) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ result }}
 
-#     - name: Create longhorn partition (remaining space)
-#       parted:
-#         device: "{{ usb_device }}"
-#         number: 2
-#         state: present
-#         fs_type: ext4
-#         part_start: "{{ k3s_partition_size }}"
-#         part_end: "100%"
+# ------------------------------------------------------------------ #
+# Merge both sources and produce final list sorted by label
+# ------------------------------------------------------------------ #
+- name: Build final data_partitions list
+  ansible.builtin.set_fact:
+    data_partitions: >-
+      {%- set result = [] -%}
+      {%- for p in data_partitions_from_facts + data_partitions_from_blkid -%}
+        {%- set fstype = fstype_map.get(p.device, p.fstype) if p.fstype == 'unknown' else p.fstype -%}
+        {%- if result.append({'device': p.device, 'label': p.label, 'uuid': p.uuid, 'fstype': fstype}) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ result | sort(attribute='label') }}
 
-#   when: partition_check.rc != 0
+- name: Show discovered DATA partitions
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: {{ data_partitions | length }} DATA partition(s) —
+      {{ data_partitions | map(attribute='label') | zip(data_partitions | map(attribute='device')) | map('join', '=') | list }}
 
-# - name: Format k3s partition
-#   filesystem:
-#     fstype: ext4
-#     dev: "{{ usb_device }}1"
-#     opts: "-L k3s"
-#     force: false
+# ------------------------------------------------------------------ #
+# Install filesystem tools if needed
+# ------------------------------------------------------------------ #
+- name: Install exfat support (for exfat partitions)
+  ansible.builtin.package:
+    name: exfatprogs
+    state: present
+  when: data_partitions | selectattr('fstype', 'equalto', 'exfat') | list | length > 0
 
-# - name: Format longhorn partition
-#   filesystem:
-#     fstype: ext4
-#     dev: "{{ usb_device }}2"
-#     opts: "-L longhorn"
-#     force: false
+# ------------------------------------------------------------------ #
+# Create mount points and mount persistently
+# ------------------------------------------------------------------ #
+- name: Create mount point directories
+  ansible.builtin.file:
+    path: "{{ storage_data_mount_base }}/{{ item.label }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  loop: "{{ data_partitions }}"
+  loop_control:
+    label: "{{ item.label }}"
 
-# - name: Create mount points
-#   file:
-#     path: "{{ item }}"
-#     state: directory
-#     mode: '0755'
-#   loop:
-#     - "{{ k3s_mount_point }}"
-#     - "{{ longhorn_mount_point }}"
+- name: Mount DATA partitions persistently (by UUID)
+  ansible.posix.mount:
+    path: "{{ storage_data_mount_base }}/{{ item.label }}"
+    src: "UUID={{ item.uuid }}"
+    fstype: "{{ item.fstype }}"
+    # exfat and vfat don't support POSIX ownership — force root-owned with sensible umask
+    opts: >-
+      {{
+        'defaults,nofail,uid=0,gid=0,umask=022'
+        if item.fstype in ['exfat', 'vfat']
+        else 'defaults,nofail'
+      }}
+    state: mounted
+  loop: "{{ data_partitions }}"
+  loop_control:
+    label: "{{ item.label }} ({{ item.device }} -> {{ storage_data_mount_base }}/{{ item.label }})"
 
-# - name: Get k3s partition UUID
-#   command: blkid -s UUID -o value {{ usb_device }}1
-#   register: k3s_uuid
-#   changed_when: false
+# ------------------------------------------------------------------ #
+# Verify
+# ------------------------------------------------------------------ #
+- name: Show mount summary
+  ansible.builtin.command:
+    cmd: "df -h {{ storage_data_mount_base }}"
+  register: mount_verify
+  changed_when: false
+  when: data_partitions | length > 0
 
-# - name: Get longhorn partition UUID
-#   command: blkid -s UUID -o value {{ usb_device }}2
-#   register: longhorn_uuid
-#   changed_when: false
-
-# - name: Mount k3s partition persistently
-#   mount:
-#     path: "{{ k3s_mount_point }}"
-#     src: "UUID={{ k3s_uuid.stdout }}"
-#     fstype: ext4
-#     opts: defaults
-#     state: mounted
-
-# - name: Mount longhorn partition persistently
-#   mount:
-#     path: "{{ longhorn_mount_point }}"
-#     src: "UUID={{ longhorn_uuid.stdout }}"
-#     fstype: ext4
-#     opts: defaults
-#     state: mounted
-
-# - name: Verify mounts
-#   command: df -h {{ k3s_mount_point }} {{ longhorn_mount_point }}
-#   changed_when: false
-#   register: mount_verify
-
-# - name: Show mount info
-#   debug:
-#     msg: "{{ mount_verify.stdout_lines }}"
+- name: Print mount summary
+  ansible.builtin.debug:
+    msg: "{{ mount_verify.stdout_lines }}"
+  when: data_partitions | length > 0

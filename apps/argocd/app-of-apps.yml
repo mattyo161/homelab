@@ -1,0 +1,36 @@
+# App of Apps — root ArgoCD Application
+#
+# This single Application tells ArgoCD to watch the apps/argocd/apps/ directory
+# in this repo and sync all Application manifests found there.
+# Each file in apps/argocd/apps/ defines one ArgoCD Application (one Helm release).
+#
+# Applied once by ansible/apps.yml after ArgoCD is bootstrapped.
+# After that, ArgoCD manages its own app list via git.
+#
+# To add a new app: create apps/argocd/apps/<name>.yml and push to git.
+# ArgoCD will detect it and sync automatically (or on next manual sync).
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+  namespace: argocd
+  # Finalizer ensures child apps are deleted when this app is deleted
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Update this to your actual repo URL after pushing
+    repoURL: https://github.com/mattyo161/homelab.git
+    targetRevision: ansible-k8s-core
+    path: apps/argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true       # remove apps deleted from git
+      selfHeal: true    # revert manual kubectl changes
+    syncOptions:
+      - CreateNamespace=true

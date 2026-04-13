@@ -8,13 +8,17 @@
 # Run specific phases:
 #   ansible-playbook -i inventory/hosts.yml site.yml --tags common
 #   ansible-playbook -i inventory/hosts.yml site.yml --tags storage
-#   ansible-playbook -i inventory/hosts.yml site.yml --tags rpi_connect
+#   ansible-playbook -i inventory/hosts.yml site.yml --tags node-config
 #
 # k3s is provided by collection k3s.orchestration (see Phase 4 below). For k3s-only runs or
 # kubeconfig refresh, use the collection playbook directly (README.md).
 #
 # Dry run:
 #   ansible-playbook -i inventory/hosts.yml site.yml --check
+#
+# Full rebuild sequence:
+#   ansible-playbook -i inventory/hosts.yml site.yml   ← runs all phases
+#   Then ArgoCD syncs apps automatically from git.
 
 # Phase 1 — Common setup on all nodes
 - name: Common node setup
@@ -32,16 +36,15 @@
   roles:
     - storage
 
-# Phase 3 — rpi-connect on all nodes
-# - name: rpi-connect setup
-#   hosts: k3s_cluster
-#   become: true
-#   tags: rpi_connect
-#   roles:
-#     - rpi_connect
-
 # Update /etc/hosts for HA cluster endpoint
 - import_playbook: hosts.yml
 
 # Phase 4 — k3s cluster (official k3s-io/k3s-ansible collection)
 - import_playbook: k3s.orchestration.site
+
+# Phase 5 — Node labels and taints
+# Runs after k3s is up. Reads host_vars/<node>/main.yml for each node
+# and applies node_labels and node_taints to the cluster.
+# This makes node scheduling config declarative and repeatable.
+# Change a node's role by editing host_vars and re-running site.yml.
+- import_playbook: node-config.yml

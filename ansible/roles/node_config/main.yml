@@ -1,0 +1,91 @@
+---
+# roles/node_config/tasks/main.yml
+#
+# Applies node labels and taints declared in host_vars to each node.
+# Runs from the first control plane node (delegate_to) so it has
+# kubectl access without needing kubeconfig on every node.
+#
+# Idempotent: labels/taints already present are left unchanged.
+# Labels/taints NOT in host_vars are also left unchanged —
+# this role only ensures declared state exists, it doesn't
+# remove labels set by other means.
+#
+# To remove a label:   set its value to null in host_vars
+# To remove a taint:   remove it from node_taints in host_vars
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.yml node-config.yml
+#   ansible-playbook -i inventory/hosts.yml node-config.yml --limit mou-mini4
+
+# ── Labels ────────────────────────────────────────────────────────────────────
+
+- name: Apply node labels
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    kind: Node
+    name: "{{ inventory_hostname }}"
+    definition:
+      metadata:
+        labels: "{{ node_labels }}"
+    merge_type: merge    # merge, not replace — preserves existing labels
+  delegate_to: localhost
+  when: node_labels | length > 0
+
+- name: Show applied labels
+  debug:
+    msg: "{{ inventory_hostname }}: labels={{ node_labels }}"
+  when: node_labels | length > 0
+
+# ── Taints ────────────────────────────────────────────────────────────────────
+# kubernetes.core.k8s doesn't handle taints well via definition merge.
+# kubectl is more reliable here and is always available on control nodes.
+
+- name: Apply node taints
+  command: >
+    kubectl taint node {{ inventory_hostname }}
+    {{ item.key }}={{ item.value }}:{{ item.effect }}
+    --overwrite
+  loop: "{{ node_taints }}"
+  delegate_to: "{{ groups['server'][0] }}"
+  become: true
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: true   # kubectl taint --overwrite always exits 0; assume changed
+  when: node_taints | length > 0
+
+- name: Remove taints not in node_taints (reconcile)
+  # This block reads current taints and removes any that aren't declared.
+  # Allows you to remove a taint by deleting it from host_vars and re-running.
+  block:
+    - name: Get current taints for node
+      command: >
+        kubectl get node {{ inventory_hostname }}
+        -o jsonpath='{.spec.taints}'
+      delegate_to: "{{ groups['server'][0] }}"
+      become: true
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: current_taints_raw
+      changed_when: false
+
+    - name: Parse current taints
+      set_fact:
+        current_taints: "{{ current_taints_raw.stdout | from_json }}"
+      when: current_taints_raw.stdout | length > 2   # not empty []
+
+    - name: Remove taints not declared in host_vars
+      command: >
+        kubectl taint node {{ inventory_hostname }}
+        {{ item.key }}={{ item.value }}:{{ item.effect }}-
+      loop: "{{ current_taints | default([]) }}"
+      delegate_to: "{{ groups['server'][0] }}"
+      become: true
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      # Only remove if this taint is NOT in our declared node_taints
+      when: >
+        item not in node_taints
+        and item.key != 'node.kubernetes.io/not-ready'
+        and item.key != 'node.kubernetes.io/unreachable'
+      changed_when: true
+  when: node_taints is defined   # always reconcile even if list is empty

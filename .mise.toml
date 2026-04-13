@@ -1,0 +1,40 @@
+# .mise.toml — project-local tool versions for the k8s homelab
+# mise will activate these automatically when you cd into this directory.
+#
+# Install all tools:  mise install
+# Install all deps:   mise run deps
+#
+# Why pip-managed ansible instead of the mise ansible plugin?
+# The mise ansible plugin creates an opaque internal venv that is hard to target
+# with pip. Managing ansible as a pip package inside a project-local .venv gives
+# full control: `pip install -r ansible/requirements.txt` installs ansible AND
+# all kubernetes.core dependencies into the same interpreter in one step.
+
+[tools]
+python  = "3.14.3"
+helm    = "3.20.1"  # kubernetes.core helm module requires <4.0.0; revisit when collection adds Helm 4 support
+kubectl = "1.35.2"
+
+[env]
+# Create (if missing) and activate a project-local venv at .venv/.
+# mise adds .venv/bin to PATH automatically via `mise activate` or `mise exec`,
+# so `ansible-playbook`, `pip`, etc. all resolve to the venv without any PATH tricks.
+# `--seed` is required when mise uses uv to create the venv (uv omits pip by default).
+_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+
+[tasks.deps]
+description = "Install Python, Ansible, and Ansible collection dependencies"
+run = [
+    "pip install -r ansible/requirements.txt",
+    "ansible-galaxy collection install -r ansible/collections/requirements.yml",
+]
+
+[tasks.check]
+description = "Dry-run the full site playbook"
+dir  = "ansible"
+run  = "ansible-playbook -i inventory/hosts.yml site.yml --check --diff"
+
+[tasks.check-apps]
+description = "Dry-run the apps bootstrap playbook"
+dir  = "ansible"
+run  = "ansible-playbook -i inventory/hosts.yml apps.yml --check --diff"

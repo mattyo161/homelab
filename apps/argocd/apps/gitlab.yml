@@ -11,7 +11,7 @@ spec:
   sources:
     - repoURL: https://charts.gitlab.io/
       chart: gitlab
-      targetRevision: "8.11.8"   # GitLab 17.11.7 — check https://docs.gitlab.com/charts/installation/version_mappings/
+      targetRevision: "9.10.3"   # GitLab 18.10.3— check https://docs.gitlab.com/charts/installation/version_mappings/
       helm:
         releaseName: gitlab
         valueFiles:

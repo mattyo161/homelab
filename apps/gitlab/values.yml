@@ -93,7 +93,7 @@ global:
 # Already installed in your cluster — disable GitLab's bundled version
 # =============================================================================
 certmanager:
-  install: false
+  enabled: false
 
 # =============================================================================
 # NGINX INGRESS

@@ -292,12 +292,13 @@ minio:
 
 # =============================================================================
 # REGISTRY — container image registry
+# storage.secret is required in recent chart versions — the `storage` property
+# was moved out of values.yml into a k8s secret to avoid plaintext credentials.
+# With bundled MinIO, GitLab creates that secret automatically.
+# Do NOT set registry.storage here — leave it unset and GitLab wires it up.
 # =============================================================================
 registry:
   enabled: true
-  storage:
-    storageClass: longhorn
-    size: 20Gi
   resources:
     requests:
       cpu: 50m

@@ -34,3 +34,16 @@ prometheus:
 
 upgradeCheck:
   enabled: false
+
+gitlab:
+  webservice:
+    replicaCount: 1
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-app

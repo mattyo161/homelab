@@ -47,3 +47,74 @@ gitlab:
                   operator: In
                   values:
                     - gitlab-app
+  sidekiq:
+    replicaCount: 1
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-app
+
+  gitaly:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-storage
+
+  gitlab-shell:
+    replicaCount: 1
+
+  kas:
+    replicaCount: 0    # disabled — re-enable when needed
+
+  gitlab-runner:
+    replicaCount: 0    # managed separately once runner token is set up
+
+postgresql:
+  primary:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-storage
+
+redis:
+  master:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-storage
+
+minio:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: role
+                operator: In
+                values:
+                  - gitlab-storage
+
+registry:
+  hpa:
+    minReplicas: 1
+    maxReplicas: 1

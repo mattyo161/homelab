@@ -16,7 +16,14 @@ global:
       cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
       traefik.ingress.kubernetes.io/router.entrypoints: websecure
 
+## Installation of certmananger.
+## This value replaces `certmanager.install` to allow certmanager schema validation to pass.
+## See dependencies in Chart.yaml for current version
+installCertmanager: false
+
 certmanager:
+  install: false
+  installCRDs: false
   enabled: false
 
 nginx-ingress:

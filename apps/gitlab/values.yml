@@ -74,10 +74,7 @@ gitlab:
     replicaCount: 1
 
   kas:
-    replicaCount: 0    # disabled — re-enable when needed
-
-  gitlab-runner:
-    replicaCount: 0    # managed separately once runner token is set up
+    enabled: false   # disabled — re-enable when needed
 
 postgresql:
   primary:
@@ -118,3 +115,6 @@ registry:
   hpa:
     minReplicas: 1
     maxReplicas: 1
+
+gitlab-runner:
+  install: false    # managed separately once runner token is set up

@@ -34,6 +34,16 @@ grafana:
 # --- Prometheus ---
 prometheus:
   prometheusSpec:
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: node-role
+                  operator: In
+                  values:
+                    - worker  # make sure that prometheus is only scheduled on worker nodes
     # How long to retain metrics data
     retention: 15d
     resources:

@@ -35,7 +35,14 @@ grafana:
 prometheus:
   prometheusSpec:
     # How long to retain metrics data
-    retention: 30d
+    retention: 15d
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 200m
+      limits:
+        memory: 1.5Gi
+        cpu: 500m
 
     storageSpec:
       volumeClaimTemplate:

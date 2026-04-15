@@ -347,6 +347,14 @@
         state: present
         src: "{{ apps_dir }}/argocd/app-of-apps.yml"
 
+    - name: Apply ArgoCD PDBs
+      tags: argocd
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        src: "{{ apps_dir }}/argocd/pdb.yml"
+
+
     - name: Get ArgoCD initial admin password
       tags: argocd
       kubernetes.core.k8s_info:

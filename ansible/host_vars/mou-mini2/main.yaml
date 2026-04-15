@@ -1,6 +1,6 @@
 node_taints:
   - key: node-role.kubernetes.io/control-plane
-    value: "true"
+    value: "false"
     effect: NoSchedule
 
 node_labels:

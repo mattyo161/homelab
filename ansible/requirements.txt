@@ -14,6 +14,7 @@
 
 # Ansible itself — pinned to the same minor as the previous mise ansible plugin version
 ansible~=13.5
+ansible-lint~=26.4
 
 # Kubernetes Python client — required by kubernetes.core.helm, kubernetes.core.k8s,
 # and kubernetes.core.k8s_info modules

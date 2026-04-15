@@ -1,0 +1,8 @@
+"architecture","board_vendor","board_version","devices","distribution","distribution_version","hostname","ip","memtotal_mb","proc_type","processor_vcpus"
+"mou-mini1","Apple Inc.","NA","Ubuntu","24.04","x86_64","192.168.5.165",9688,2,"Intel(R) Core(TM)2 Duo CPU     P8600  @ 2.40GHz","/ (47GB); /mnt/data/DATA (78GB)"
+"mou-mini2","Apple Inc.","Macmini6,1","Ubuntu","24.04","x86_64","192.168.5.166",9851,4,"Intel(R) Core(TM) i5-3210M CPU @ 2.50GHz","/ (78GB)"
+"mou-mini3","Apple Inc.","Macmini6,1","Ubuntu","24.04","x86_64","192.168.5.167",9851,4,"Intel(R) Core(TM) i5-3210M CPU @ 2.50GHz","/ (78GB)"
+"mou-mini4","Apple Inc.","Macmini6,1","Ubuntu","24.04","x86_64","192.168.5.168",15899,4,"Intel(R) Core(TM) i5-3210M CPU @ 2.50GHz","/ (76GB); /mnt/data/DATA1 (195GB); /mnt/data/DATA2 (195GB); /mnt/data/DATA3 (286GB)"
+"mou-mini5","Apple Inc.","Macmini7,1","Ubuntu","24.04","x86_64","192.168.5.169",3791,4,"Intel(R) Core(TM) i5-4260U CPU @ 1.40GHz","/ (76GB); /mnt/data/DATA1 (195GB); /mnt/data/DATA2 (195GB); /mnt/data/DATA3 (290GB)"
+"mou-pc1","Gigabyte Technology Co., Ltd.","x.x","Linux Mint","22.3","x86_64","192.168.5.151",5871,4,"AMD Ryzen 3 2200G with Radeon Vega Graphics",""
+"mou-pi5","","","Debian","13.2","aarch64","192.168.5.162",2010,4,"2","/ (112GB)"

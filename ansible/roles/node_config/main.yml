@@ -30,11 +30,13 @@
     merge_type: merge    # merge, not replace — preserves existing labels
   delegate_to: localhost
   when: node_labels | length > 0
+  tags: node-config
 
 - name: Show applied labels
   debug:
     msg: "{{ inventory_hostname }}: labels={{ node_labels }}"
   when: node_labels | length > 0
+  tags: node-config
 
 # ── Taints ────────────────────────────────────────────────────────────────────
 # kubernetes.core.k8s doesn't handle taints well via definition merge.
@@ -52,6 +54,7 @@
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: true   # kubectl taint --overwrite always exits 0; assume changed
   when: node_taints | length > 0
+  tags: node-config
 
 - name: Remove taints not in node_taints (reconcile)
   # This block reads current taints and removes any that aren't declared.
@@ -89,3 +92,4 @@
         and item.key != 'node.kubernetes.io/unreachable'
       changed_when: true
   when: node_taints is defined   # always reconcile even if list is empty
+  tags: node-config

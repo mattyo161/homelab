@@ -33,18 +33,15 @@ customConfig:
         codec: ndjson
       auth:
         strategy: bearer
-        token: "${BETTERSTACK_LOGS_TOKEN}"
+        token: "$BETTERSTACK_LOGS_TOKEN"
       batch:
         timeout_secs: 10
       request:
         retry_max_duration_secs: 30
 
-extraEnv:
-  - name: BETTERSTACK_LOGS_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: betterstack-credentials
-        key: logs-token
+envFrom:
+  - secretRef:
+      name: betterstack-credentials
 
 # Resource limits for the DaemonSet pods
 resources:

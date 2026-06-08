@@ -9,7 +9,8 @@
 #   3. Run: ansible-playbook -i inventory/hosts.yml ansible/apps.yml --tags betterstack-secrets
 #   4. ArgoCD will deploy this after the secret exists
 #
-# Verify image version at: https://hub.docker.com/r/betterstack/uptime-agent/tags
+# Image: find the correct image in BetterStack Uptime > Private Locations > Docker setup
+# It is NOT on Docker Hub — check BetterStack docs for the registry URL and image name.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,13 +30,10 @@ spec:
     spec:
       containers:
         - name: uptime-agent
-          image: betterstack/uptime-agent:latest
-          env:
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: betterstack-credentials
-                  key: uptime-api-key
+          image: betterstack/uptime-agent:latest  # TODO: replace with correct image from BetterStack docs
+          envFrom:
+            - secretRef:
+                name: betterstack-credentials
           resources:
             requests:
               memory: 32Mi

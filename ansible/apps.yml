@@ -372,8 +372,8 @@
             name: betterstack-credentials
             namespace: betterstack
           stringData:
-            logs-token: "{{ betterstack_logs_token }}"
-            uptime-api-key: "{{ betterstack_uptime_api_key }}"
+            BETTERSTACK_LOGS_TOKEN: "{{ betterstack_logs_token }}"
+            BETTERSTACK_UPTIME_API_KEY: "{{ betterstack_uptime_api_key }}"
 
     - name: Create BetterStack telemetry secret (used by Prometheus remote_write)
       tags: betterstack-secrets

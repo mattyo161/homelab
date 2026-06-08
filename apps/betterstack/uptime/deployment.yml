@@ -1,0 +1,45 @@
+---
+# BetterStack Private Location runner
+# Allows BetterStack to monitor internal services on the oue.home domain
+# that are not reachable from the public internet.
+#
+# Setup:
+#   1. In BetterStack Uptime > Private Locations, create a new private location
+#   2. Copy the API key provided and store it in ansible-vault as betterstack_uptime_api_key
+#   3. Run: ansible-playbook -i inventory/hosts.yml ansible/apps.yml --tags betterstack-secrets
+#   4. ArgoCD will deploy this after the secret exists
+#
+# Verify image version at: https://hub.docker.com/r/betterstack/uptime-agent/tags
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: betterstack-uptime-agent
+  namespace: betterstack
+  labels:
+    app: betterstack-uptime-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: betterstack-uptime-agent
+  template:
+    metadata:
+      labels:
+        app: betterstack-uptime-agent
+    spec:
+      containers:
+        - name: uptime-agent
+          image: betterstack/uptime-agent:latest
+          env:
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: betterstack-credentials
+                  key: uptime-api-key
+          resources:
+            requests:
+              memory: 32Mi
+              cpu: 10m
+            limits:
+              memory: 128Mi
+              cpu: 100m

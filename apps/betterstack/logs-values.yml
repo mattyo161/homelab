@@ -1,0 +1,62 @@
+# Vector Helm values — ships Kubernetes pod logs to BetterStack Logs
+# Chart: vector from https://helm.vector.dev
+# Docs: https://vector.dev/docs/setup/installation/package-managers/helm/
+#
+# Prerequisite: the 'betterstack-credentials' Secret must exist in the betterstack
+# namespace before ArgoCD syncs this app. See ansible/apps.yml for creation.
+
+role: Agent  # DaemonSet — one pod per node, tails all pod logs
+
+customConfig:
+  data_dir: /vector-data-dir
+
+  sources:
+    kubernetes_logs:
+      type: kubernetes_logs
+      # Annotate pods with vector.dev/exclude: "true" to skip them
+
+  transforms:
+    # Enrich with cluster metadata
+    add_cluster_meta:
+      type: remap
+      inputs: [kubernetes_logs]
+      source: |
+        .cluster = "homelab"
+        .environment = "production"
+
+  sinks:
+    betterstack:
+      type: http
+      inputs: [add_cluster_meta]
+      uri: "https://in.logs.betterstack.com"
+      encoding:
+        codec: ndjson
+      auth:
+        strategy: bearer
+        token: "${BETTERSTACK_LOGS_TOKEN}"
+      batch:
+        timeout_secs: 10
+      request:
+        retry_max_duration_secs: 30
+
+extraEnv:
+  - name: BETTERSTACK_LOGS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: betterstack-credentials
+        key: logs-token
+
+# Resource limits for the DaemonSet pods
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 50m
+  limits:
+    memory: 256Mi
+    cpu: 200m
+
+# Persist Vector's position file so it doesn't re-ship logs after restarts
+persistence:
+  enabled: true
+  storageClassName: longhorn
+  size: 1Gi

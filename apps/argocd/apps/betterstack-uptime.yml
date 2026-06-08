@@ -1,0 +1,23 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: betterstack-uptime
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/mattyo161/homelab.git
+    targetRevision: ansible-k8s-core
+    path: apps/betterstack/uptime
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: betterstack
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

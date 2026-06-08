@@ -63,6 +63,15 @@ prometheus:
             requests:
               storage: 20Gi
 
+    # Ship metrics to BetterStack Telemetry
+    # Token stored in the betterstack-telemetry Secret (created by ansible/apps.yml)
+    # Get your endpoint URL from BetterStack > Telemetry > Connect
+    remoteWrite:
+      - url: "https://in.telemetry.betterstack.com/prometheus/write"
+        bearerTokenSecret:
+          name: betterstack-telemetry
+          key: bearerToken
+
   ingress:
     enabled: true
     ingressClassName: traefik

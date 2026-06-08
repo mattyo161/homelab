@@ -340,6 +340,58 @@
     # ------------------------------------------------------------------ #
     # App of Apps — ArgoCD now takes over from here
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    # BetterStack secrets
+    # Run: ansible-playbook -i inventory/hosts.yml apps.yml --tags betterstack-secrets
+    #
+    # Required ansible-vault variables (add to inventory/group_vars/k3s_cluster/vault.yml):
+    #   betterstack_logs_token       — BetterStack Logs > Source > token
+    #   betterstack_uptime_api_key   — BetterStack Uptime > Private Locations > API key
+    #   betterstack_telemetry_token  — BetterStack Telemetry > Connect > bearer token
+    # ------------------------------------------------------------------ #
+    - name: Create betterstack namespace
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: betterstack
+
+    - name: Create BetterStack logs + uptime credentials secret
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: betterstack-credentials
+            namespace: betterstack
+          stringData:
+            logs-token: "{{ betterstack_logs_token }}"
+            uptime-api-key: "{{ betterstack_uptime_api_key }}"
+
+    - name: Create BetterStack telemetry secret (used by Prometheus remote_write)
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: betterstack-telemetry
+            namespace: monitoring
+          stringData:
+            bearerToken: "{{ betterstack_telemetry_token }}"
+
+    # ------------------------------------------------------------------ #
+    # App of Apps — ArgoCD now takes over from here
+    # ------------------------------------------------------------------ #
     - name: Apply App of Apps root Application
       tags: argocd
       kubernetes.core.k8s:

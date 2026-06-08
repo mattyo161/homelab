@@ -54,6 +54,15 @@ prometheus:
         memory: 1.5Gi
         cpu: 500m
 
+    additionalScrapeConfigs:
+      - job_name: gitlab
+        metrics_path: /-/metrics
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true   # selfsigned cert
+        static_configs:
+          - targets: ['gitlab.oue.home']
+
     storageSpec:
       volumeClaimTemplate:
         spec:

@@ -345,9 +345,10 @@
     # Run: ansible-playbook -i inventory/hosts.yml apps.yml --tags betterstack-secrets
     #
     # Required ansible-vault variables (add to inventory/group_vars/k3s_cluster/vault.yml):
-    #   betterstack_logs_token       — BetterStack Logs > Source > token
-    #   betterstack_uptime_api_key   — BetterStack Uptime > Private Locations > API key
-    #   betterstack_telemetry_token  — BetterStack Telemetry > Connect > bearer token
+    #   betterstack_logs_token              — BetterStack Logs > Source > token
+    #   betterstack_telemetry_token         — BetterStack Telemetry > Connect > bearer token
+    #   betterstack_heartbeat_argocd_url    — BetterStack Uptime > Heartbeat monitors > argocd > URL
+    #   (add one betterstack_heartbeat_<name>_url per monitored service)
     # ------------------------------------------------------------------ #
     - name: Create betterstack namespace
       tags: betterstack-secrets
@@ -360,7 +361,7 @@
           metadata:
             name: betterstack
 
-    - name: Create BetterStack logs + uptime credentials secret
+    - name: Create BetterStack logs credentials secret
       tags: betterstack-secrets
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
@@ -373,7 +374,20 @@
             namespace: betterstack
           stringData:
             BETTERSTACK_LOGS_TOKEN: "{{ betterstack_logs_token }}"
-            BETTERSTACK_UPTIME_API_KEY: "{{ betterstack_uptime_api_key }}"
+
+    - name: Create BetterStack heartbeat URLs secret
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: betterstack-heartbeats
+            namespace: betterstack
+          stringData:
+            ARGOCD_HEARTBEAT_URL: "{{ betterstack_heartbeat_argocd_url }}"
 
     - name: Create BetterStack telemetry secret (used by Prometheus remote_write)
       tags: betterstack-secrets

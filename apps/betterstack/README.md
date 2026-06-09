@@ -25,8 +25,8 @@ Covers three BetterStack products deployed to the homelab k3s cluster via ArgoCD
 | Ansible variable | Where to find it in BetterStack |
 |---|---|
 | `betterstack_logs_token` | Logs → Sources → Create source → copy **Source token** |
-| `betterstack_uptime_api_key` | Uptime → Private Locations → New location → copy **API key** |
 | `betterstack_telemetry_token` | Telemetry → Connect → copy **Bearer token** |
+| `betterstack_heartbeat_argocd_url` | Uptime → Heartbeat monitors → New monitor (period: 2m, grace: 1m) → copy **Heartbeat URL** |
 
 ### Step 2 — Store tokens in ansible-vault
 
@@ -64,7 +64,8 @@ This creates two Kubernetes Secrets:
 
 | Secret | Namespace | Keys |
 |---|---|---|
-| `betterstack-credentials` | `betterstack` | `logs-token`, `uptime-api-key` |
+| `betterstack-credentials` | `betterstack` | `BETTERSTACK_LOGS_TOKEN` |
+| `betterstack-heartbeats` | `betterstack` | `ARGOCD_HEARTBEAT_URL` (one key per monitored service) |
 | `betterstack-telemetry` | `monitoring` | `bearerToken` |
 
 ### Step 5 — Verify ArgoCD sync
@@ -100,6 +101,27 @@ Metrics have no separate ArgoCD app — the `remoteWrite` block is added directl
 
 ---
 
+## Adding a new heartbeat monitor
+
+To monitor another internal service (e.g. Grafana):
+
+1. In BetterStack Uptime → Heartbeat monitors, create a new monitor (period: 2m, grace: 1m). Copy the heartbeat URL.
+
+2. Add to vault:
+   ```bash
+   ansible-vault edit ansible/inventory/group_vars/k3s_cluster/vault.yml
+   # add: betterstack_heartbeat_grafana_url: "https://uptime.betterstack.com/api/v1/heartbeat/<token>"
+   ```
+
+3. Add the key to the `betterstack-heartbeats` secret in `ansible/apps.yml`:
+   ```yaml
+   GRAFANA_HEARTBEAT_URL: "{{ betterstack_heartbeat_grafana_url }}"
+   ```
+
+4. Copy the CronJob in `apps/betterstack/uptime/deployment.yml`, change `name`, `SERVICE_URL`, and the `secretKeyRef.key`.
+
+5. Re-run secrets and push to git.
+
 ## Rotating a token
 
 1. Update the value in `vault.yml`:
@@ -118,9 +140,6 @@ Metrics have no separate ArgoCD app — the `remoteWrite` block is added directl
    ```bash
    # Logs
    kubectl rollout restart daemonset/betterstack-logs-vector -n betterstack
-
-   # Uptime
-   kubectl rollout restart deployment/betterstack-uptime-agent -n betterstack
 
    # Metrics — Prometheus reloads config automatically on secret change
    ```
@@ -144,16 +163,20 @@ kubectl get secret betterstack-credentials -n betterstack -o jsonpath='{.data.lo
 
 Common causes: wrong source token, incorrect BetterStack ingestion URL, Vector pod crashlooping.
 
-### Uptime agent not connecting
+### Heartbeat CronJob not firing
 
 ```bash
-kubectl logs -n betterstack deployment/betterstack-uptime-agent
+# Check recent job runs
+kubectl get jobs -n betterstack
 
-# Verify secret
-kubectl get secret betterstack-credentials -n betterstack -o jsonpath='{.data.uptime-api-key}' | base64 -d
+# Check logs from the last heartbeat job
+kubectl logs -n betterstack -l job-name --tail=20
+
+# Verify the heartbeat secret exists
+kubectl get secret betterstack-heartbeats -n betterstack -o jsonpath='{.data.ARGOCD_HEARTBEAT_URL}' | base64 -d
 ```
 
-Check BetterStack UI → Uptime → Private Locations to confirm the agent shows as connected.
+In BetterStack, the heartbeat monitor will show as down if the CronJob stops running or the service URL fails to respond.
 
 ### Metrics not appearing in BetterStack Telemetry
 

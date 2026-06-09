@@ -21,6 +21,8 @@ Everything else is declared as ArgoCD `Application` resources in `apps/argocd/ap
 |-----|-----------|------------------------|
 | ArgoCD | argocd | (bootstrapped by Ansible, then self-managed) |
 | kube-prometheus-stack | monitoring | `apps/argocd/apps/prometheus-stack.yml` |
+| Loki | monitoring | `apps/argocd/apps/loki.yml` |
+| Vector (log shipper) | betterstack | `apps/argocd/apps/betterstack-logs.yml` |
 | Headlamp | headlamp | `apps/argocd/apps/headlamp.yml` |
 
 ### Adding a new app
@@ -76,7 +78,7 @@ sudo security add-trusted-cert -d -r trustRoot \
 | App | URL | Credentials |
 |-----|-----|-------------|
 | ArgoCD | https://argocd.oue.home | admin / printed by apps.yml |
-| Grafana | https://grafana.oue.home | admin / vault_grafana_admin_password |
+| Grafana | https://grafana.oue.home | admin / vault_grafana_admin_password (Explore → Loki for logs) |
 | Prometheus | https://prometheus.oue.home | none |
 | Traefik | https://traefik.oue.home/dashboard/ | none |
 | Longhorn | https://longhorn.oue.home | none |

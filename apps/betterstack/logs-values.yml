@@ -1,9 +1,11 @@
-# Vector Helm values — ships Kubernetes pod logs to BetterStack Logs
+# Vector Helm values — ships Kubernetes pod logs to Loki and BetterStack Logs
 # Chart: vector from https://helm.vector.dev
 # Docs: https://vector.dev/docs/setup/installation/package-managers/helm/
 #
 # Prerequisite: the 'betterstack-credentials' Secret must exist in the betterstack
 # namespace before ArgoCD syncs this app. See ansible/apps.yml for creation.
+# Loki must be running in the monitoring namespace before logs arrive.
+# See apps/loki/values.yml and apps/argocd/apps/loki.yml.
 
 role: Agent  # DaemonSet — one pod per node, tails all pod logs
 
@@ -59,6 +61,22 @@ customConfig:
         ], ns) && level != "info"
 
   sinks:
+    loki:
+      type: loki
+      inputs: [filter_noise]
+      endpoint: http://loki.monitoring.svc.cluster.local:3100
+      out_of_order_action: accept
+      remove_timestamp: true
+      encoding:
+        codec: text
+      labels:
+        cluster: homelab
+        namespace: "{{ kubernetes.pod_namespace }}"
+        pod: "{{ kubernetes.pod_name }}"
+        container: "{{ kubernetes.container_name }}"
+        node: "{{ kubernetes.pod_node_name }}"
+        log_level: "{{ log_level }}"
+        
     betterstack:
       type: http
       inputs: [filter_noise]

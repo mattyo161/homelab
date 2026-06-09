@@ -10,8 +10,9 @@ kube-prometheus-stack bundles Prometheus, Grafana, Alertmanager, node-exporter, 
 
 | Component | URL | Purpose |
 |---|---|---|
-| Grafana | https://grafana.oue.home | Dashboards and visualization |
+| Grafana | https://grafana.oue.home | Dashboards, metrics, and log search (Loki datasource) |
 | Prometheus | https://prometheus.oue.home | Metrics collection and querying |
+| Loki | (internal) | Log storage — query via Grafana Explore |
 | Alertmanager | (internal) | Alert routing and silencing |
 
 ## Managed by

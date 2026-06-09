@@ -30,7 +30,7 @@ customConfig:
       inputs: [add_cluster_meta]
       uri: "https://in.logs.betterstack.com"
       encoding:
-        codec: ndjson
+        codec: json
       auth:
         strategy: bearer
         token: "$BETTERSTACK_LOGS_TOKEN"

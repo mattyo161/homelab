@@ -12,7 +12,8 @@ defaultSettings:
   # Nodes without a DATA1 mount fall back to the Longhorn default (/var/lib/longhorn).
   # The storage role mounts DATA partitions at /mnt/data/<LABEL> on each node.
   defaultDataPath: /mnt/data/DATA1
-
+  logLevel: Warn
+  
 # Ingress for the Longhorn UI
 ingress:
   enabled: true

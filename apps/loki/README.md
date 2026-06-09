@@ -10,7 +10,10 @@ Local log aggregation for the homelab cluster. Stores pod logs on Longhorn and q
 
 ```
 Pod logs → Vector DaemonSet (betterstack namespace) → Loki (monitoring) → Grafana Explore
+                                              └──► BetterStack Logs (filtered subset)
 ```
+
+Vector ships **all** pod logs to Loki with no namespace or level filtering. The BetterStack sink uses a separate filtered path — see `apps/betterstack/README.md`.
 
 ## Managed by
 
@@ -44,6 +47,9 @@ kubectl -n monitoring run -it --rm curl --image=curlimages/curl --restart=Never 
 
 # A specific pod
 {namespace="gitlab", pod=~"gitlab-webservice.*"}
+
+# Filter info locally in LogQL (Loki receives all levels)
+{namespace="gitlab"} != "info"
 ```
 
 ## Tuning
@@ -56,4 +62,4 @@ Edit `apps/loki/values.yml`:
 | `singleBinary.persistence.size` | `20Gi` | Longhorn PVC size |
 | `singleBinary.resources` | 256Mi–1Gi | Memory for ingestion/query |
 
-Log shipping filters live in `apps/betterstack/logs-values.yml` (Vector).
+BetterStack-only filters (namespace exclusions, info-level drops) live in `apps/betterstack/logs-values.yml` under the `filter_noise` transform.

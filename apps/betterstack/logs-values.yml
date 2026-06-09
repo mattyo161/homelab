@@ -36,6 +36,7 @@ customConfig:
           }
         }
 
+    # BetterStack only — Loki receives the full stream via add_cluster_meta (no filter).
     # Drop high-volume infrastructure namespaces (edit list to taste).
     # To ship only specific apps, switch to an allowlist, e.g.:
     #   includes(["dev", "prod", "gitlab"], string!(.kubernetes.pod_namespace))
@@ -63,7 +64,7 @@ customConfig:
   sinks:
     loki:
       type: loki
-      inputs: [filter_noise]
+      inputs: [add_cluster_meta]
       endpoint: http://loki.monitoring.svc.cluster.local:3100
       out_of_order_action: accept
       remove_timestamp: true
@@ -76,7 +77,7 @@ customConfig:
         container: "{{ kubernetes.container_name }}"
         node: "{{ kubernetes.pod_node_name }}"
         log_level: "{{ log_level }}"
-        
+
     betterstack:
       type: http
       inputs: [filter_noise]

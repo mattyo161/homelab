@@ -1,12 +1,34 @@
 # BetterStack Integration Runbook
 
-Covers three BetterStack products deployed to the homelab k3s cluster via ArgoCD:
+Covers BetterStack products and cluster log shipping for the homelab k3s cluster via ArgoCD.
 
 | Product | What it does | ArgoCD App |
 |---|---|---|
-| **Logs** | Vector DaemonSet ships pod logs to Loki (query in Grafana) | `betterstack-logs` |
+| **Logs (BetterStack)** | Vector ships filtered pod logs to BetterStack Logs (cloud) | `betterstack-logs` |
+| **Logs (Loki)** | Vector ships all pod logs to in-cluster Loki → Grafana Explore | `betterstack-logs` + `loki` |
 | **Uptime** | Private location runner monitors internal `oue.home` services | `betterstack-uptime` |
 | **Metrics** | Prometheus remote_write ships cluster metrics to BetterStack Telemetry | _(via prometheus-stack)_ |
+
+## Log shipping architecture
+
+```
+kubernetes_logs
+      │
+      ▼
+ add_cluster_meta  ──────────────────►  Loki (all logs, no filter)
+      │
+      ▼
+ filter_noise      ──────────────────►  BetterStack (filtered — saves quota)
+```
+
+Vector config: `apps/betterstack/logs-values.yml`
+
+| Destination | Input transform | Filtering |
+|---|---|---|
+| **Loki** | `add_cluster_meta` | None — all pod logs |
+| **BetterStack** | `filter_noise` | Namespace exclusions + drops `info` level |
+
+Query Loki locally at https://grafana.oue.home → Explore → Loki. See `apps/loki/README.md`.
 
 ---
 
@@ -15,6 +37,7 @@ Covers three BetterStack products deployed to the homelab k3s cluster via ArgoCD
 - Cluster bootstrapped (`ansible-playbook ansible/apps.yml`)
 - ArgoCD running and app-of-apps syncing
 - BetterStack account with Logs, Uptime, and Telemetry products enabled
+- Loki deployed (`apps/argocd/apps/loki.yml`)
 
 ---
 
@@ -31,7 +54,7 @@ Covers three BetterStack products deployed to the homelab k3s cluster via ArgoCD
 ### Step 2 — Store tokens in ansible-vault
 
 ```bash
-ansible-vault edit ansible/inventory/group_vars/k3s_cluster/vault.yml
+ansible-vault edit ansible/inventory/group_vars/all/vault.yml
 ```
 
 Add:
@@ -47,14 +70,13 @@ betterstack_telemetry_token: "your-telemetry-bearer-token"
 ArgoCD reads manifests from git, so the files must be present before the secrets are created.
 
 ```bash
-git add apps/argocd/apps/betterstack-*.yml apps/betterstack/ apps/prometheus-stack/values.yml ansible/apps.yml
-git commit -m "feat: add betterstack logs, uptime, and metrics integration"
+git add apps/argocd/apps/betterstack-*.yml apps/argocd/apps/loki.yml \
+  apps/betterstack/ apps/loki/ apps/prometheus-stack/values.yml ansible/apps.yml
+git commit -m "feat: add betterstack and loki log shipping"
 git push
 ```
 
-### Step 4 — Create secrets in the cluster (uptime + metrics only)
-
-Logs now go to **Loki** in-cluster (no BetterStack logs token needed). Secrets are still required for uptime heartbeats and Prometheus remote_write metrics:
+### Step 4 — Create secrets in the cluster
 
 ```bash
 ansible-playbook -i ansible/inventory/hosts.yml ansible/apps.yml \
@@ -64,15 +86,15 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/apps.yml \
 
 | Secret | Namespace | Keys |
 |---|---|---|
+| `betterstack-credentials` | `betterstack` | `BETTERSTACK_LOGS_TOKEN` |
 | `betterstack-heartbeats` | `betterstack` | `ARGOCD_HEARTBEAT_URL` (one key per monitored service) |
 | `betterstack-telemetry` | `monitoring` | `bearerToken` |
 
 ### Step 5 — Verify ArgoCD sync
 
-ArgoCD detects the new Application manifests automatically. Check status:
-
 ```bash
 argocd app list
+argocd app get loki
 argocd app get betterstack-logs
 argocd app get betterstack-uptime
 ```
@@ -85,14 +107,18 @@ Or open the ArgoCD UI at `https://argocd.oue.home`.
 
 ```
 apps/betterstack/
-  logs-values.yml          # Vector Helm values (log shipping config)
+  logs-values.yml          # Vector Helm values (dual Loki + BetterStack sinks)
   uptime/
     deployment.yml         # Private location agent Deployment
   README.md                # This file
 
+apps/loki/
+  values.yml               # Loki Helm values (log storage)
+
 apps/argocd/apps/
   betterstack-logs.yml     # ArgoCD Application — Vector (Helm)
-  betterstack-uptime.yml   # ArgoCD Application — private location runner (raw manifests)
+  betterstack-uptime.yml   # ArgoCD Application — private location runner
+  loki.yml                 # ArgoCD Application — Loki (Helm)
 ```
 
 Metrics have no separate ArgoCD app — the `remoteWrite` block is added directly to
@@ -108,7 +134,7 @@ To monitor another internal service (e.g. Grafana):
 
 2. Add to vault:
    ```bash
-   ansible-vault edit ansible/inventory/group_vars/k3s_cluster/vault.yml
+   ansible-vault edit ansible/inventory/group_vars/all/vault.yml
    # add: betterstack_heartbeat_grafana_url: "https://uptime.betterstack.com/api/v1/heartbeat/<token>"
    ```
 
@@ -125,7 +151,7 @@ To monitor another internal service (e.g. Grafana):
 
 1. Update the value in `vault.yml`:
    ```bash
-   ansible-vault edit ansible/inventory/group_vars/k3s_cluster/vault.yml
+   ansible-vault edit ansible/inventory/group_vars/all/vault.yml
    ```
 
 2. Re-run the secrets task:
@@ -137,7 +163,6 @@ To monitor another internal service (e.g. Grafana):
 
 3. Restart the affected pod to pick up the new secret value:
    ```bash
-   # Logs
    kubectl rollout restart daemonset/betterstack-logs-vector -n betterstack
 
    # Metrics — Prometheus reloads config automatically on secret change
@@ -145,25 +170,29 @@ To monitor another internal service (e.g. Grafana):
 
 ---
 
-## Querying logs locally
+## Querying logs locally (Loki)
 
 1. Ensure Loki is synced: `argocd app get loki`
 2. Open https://grafana.oue.home → **Explore** → datasource **Loki**
 3. See `apps/loki/README.md` for LogQL examples
 
-## Reducing log volume
+Loki receives **all** pod logs with no namespace or level filtering.
 
-Vector ships filtered pod logs to Loki. Infrastructure namespaces (kube-system, monitoring, longhorn, argocd, etc.) are usually the noisiest.
+## Reducing BetterStack log volume
 
-**Namespace filter** — edit the `filter_noise` transform in `apps/betterstack/logs-values.yml`. Add or remove namespaces from the exclusion list, or switch to an allowlist if you only want a few apps:
+Filtering applies to the **BetterStack sink only** — Loki is unaffected.
+
+Edit the `filter_noise` transform in `apps/betterstack/logs-values.yml`.
+
+**Namespace filter** — add or remove namespaces from the exclusion list, or switch to an allowlist:
 
 ```yaml
 condition: includes(["dev", "prod", "gitlab"], string!(.kubernetes.pod_namespace))
 ```
 
-**Log level** — `filter_noise` drops `info` when the level is in a structured field (`.level`, `.severity`) or JSON message body. Unstructured lines without a detectable level still ship. Edit the `level != "info"` check in `logs-values.yml` to change this.
+**Log level** — `filter_noise` drops `info` when the level is in a structured field (`.level`, `.severity`) or JSON message body. Unstructured lines without a detectable level still ship to BetterStack.
 
-**Per-pod opt-out** — annotate a pod or deployment:
+**Per-pod opt-out** — annotate a pod or deployment (applies to both sinks via the kubernetes_logs source):
 
 ```yaml
 metadata:
@@ -184,40 +213,38 @@ kubectl rollout restart daemonset/betterstack-logs-vector -n betterstack
 ### Logs not appearing in BetterStack
 
 ```bash
-# Check Vector pod status
 kubectl get pods -n betterstack
-
-# Tail Vector logs for errors
 kubectl logs -n betterstack -l app.kubernetes.io/name=vector --tail=50
-
-# Confirm secret exists and has the right key
-kubectl get secret betterstack-credentials -n betterstack -o jsonpath='{.data.logs-token}' | base64 -d
+kubectl get secret betterstack-credentials -n betterstack \
+  -o jsonpath='{.data.BETTERSTACK_LOGS_TOKEN}' | base64 -d; echo
 ```
 
-Common causes: wrong source token, incorrect BetterStack ingestion URL, Vector pod crashlooping.
+Common causes: wrong source token, quota exceeded (`402 Payment Required` in Vector logs), incorrect ingestion URL, Vector pod crashlooping.
+
+### Logs not appearing in Loki
+
+```bash
+kubectl -n monitoring get pods -l app.kubernetes.io/name=loki
+kubectl logs -n betterstack -l app.kubernetes.io/name=vector --tail=50 | grep -i loki
+kubectl -n monitoring run -it --rm curl --image=curlimages/curl --restart=Never -- \
+  curl -sS http://loki.monitoring.svc.cluster.local:3100/ready
+```
+
+Common causes: Loki pod not running (check Longhorn PVC), Vector not synced after config change.
 
 ### Heartbeat CronJob not firing
 
 ```bash
-# Check recent job runs
 kubectl get jobs -n betterstack
-
-# Check logs from the last heartbeat job
 kubectl logs -n betterstack -l job-name --tail=20
-
-# Verify the heartbeat secret exists
-kubectl get secret betterstack-heartbeats -n betterstack -o jsonpath='{.data.ARGOCD_HEARTBEAT_URL}' | base64 -d
+kubectl get secret betterstack-heartbeats -n betterstack \
+  -o jsonpath='{.data.ARGOCD_HEARTBEAT_URL}' | base64 -d
 ```
-
-In BetterStack, the heartbeat monitor will show as down if the CronJob stops running or the service URL fails to respond.
 
 ### Metrics not appearing in BetterStack Telemetry
 
 ```bash
-# Check Prometheus remote_write errors
 kubectl logs -n monitoring -l app.kubernetes.io/name=prometheus --tail=100 | grep -i "remote"
-
-# Verify the telemetry secret exists in the monitoring namespace
 kubectl get secret betterstack-telemetry -n monitoring
 ```
 
@@ -226,25 +253,24 @@ Common cause: secret in wrong namespace (`betterstack-telemetry` must be in `mon
 ### ArgoCD app stuck in OutOfSync
 
 ```bash
+argocd app sync loki
 argocd app sync betterstack-logs
 argocd app sync betterstack-uptime
 ```
-
-If the app errors because the secret doesn't exist yet, run Step 4 first, then re-sync.
 
 ---
 
 ## Version pinning
 
-Check and update these periodically:
-
 | Component | File | Field | Current |
 |---|---|---|---|
 | Vector Helm chart | `apps/argocd/apps/betterstack-logs.yml` | `targetRevision` | `0.36.0` |
+| Loki Helm chart | `apps/argocd/apps/loki.yml` | `targetRevision` | `6.55.0` |
 | Uptime agent image | `apps/betterstack/uptime/deployment.yml` | `image` | `betterstack/uptime-agent:latest` |
 
 ```bash
-# Check latest Vector chart version
 helm repo add vector https://helm.vector.dev
 helm search repo vector/vector
+helm repo add grafana https://grafana.github.io/helm-charts
+helm search repo grafana/loki
 ```

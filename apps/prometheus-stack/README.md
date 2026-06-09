@@ -71,7 +71,7 @@ kubectl -n monitoring get secret prometheus-stack-grafana \
 {namespace="gitlab", pod=~"gitlab-webservice.*"}
 ```
 
-Logs are shipped by Vector (`apps/betterstack/logs-values.yml`) into Loki (`apps/loki/values.yml`).
+Vector (`apps/betterstack/logs-values.yml`) ships all pod logs to Loki and a filtered subset to BetterStack. Loki config: `apps/loki/values.yml`.
 
 ## Prometheus
 

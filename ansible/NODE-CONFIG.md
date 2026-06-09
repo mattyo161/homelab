@@ -18,7 +18,7 @@ A full cluster wipe-and-rebuild produces identical scheduling.
 | mou-mini4 | 4C / 15.5G | Worker + GitLab storage | `role=gitlab-storage` | none |
 | mou-mini3 | 4C / 3.7G  | Worker + runner jobs | `role=runner` | none |
 | mou-mini5 | 4C / 3.7G  | Worker + runner jobs | `role=runner` | none |
-| mou-pi5   | 4C / 2.0G  | Worker (ARM64 only) | `role=arm64-only` | `arch=arm64:NoSchedule` |
+| mou-pi5   | 4C / 2.0G  | Worker (ARM64 only) | `role=arm64-only` | `arch=arm64:NoSchedule` (Longhorn replicas **excluded**) |
 
 ## How to change a node's role
 

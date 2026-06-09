@@ -39,9 +39,3 @@ server_config_yaml: |
 # Each discovered DATA* partition gets a subdirectory: /mnt/data/DATA1, /mnt/data/DATA2 etc.
 storage_data_mount_base: /mnt/data
 
-# Longhorn must never place replicas on these nodes.
-# Ansible applies allowScheduling=false + evictionRequested=true after Helm install.
-longhorn_excluded_nodes:
-  - mou-pi5    # ARM64 only — amd64 workloads and unreliable for shared storage
-  - mou-mini1  # cordoned control plane
-

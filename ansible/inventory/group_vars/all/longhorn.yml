@@ -1,0 +1,9 @@
+---
+# Longhorn settings used by ansible/apps.yml (localhost play) and cluster plays.
+# Must live under group_vars/all/ so localhost inherits them.
+
+# Nodes that must never receive Longhorn replicas.
+# apps.yml applies allowScheduling=false + evictionRequested=true after Helm install.
+longhorn_excluded_nodes:
+  - mou-pi5    # ARM64 only — not suitable for shared amd64 storage
+  - mou-mini1  # cordoned control plane

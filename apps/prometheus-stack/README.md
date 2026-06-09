@@ -59,6 +59,20 @@ kubectl -n monitoring get secret prometheus-stack-grafana \
   -o jsonpath='{.data.admin-password}' | base64 -d
 ```
 
+### Log search (Loki)
+
+1. Open https://grafana.oue.home → **Explore**
+2. Select the **Loki** datasource
+3. Example queries:
+
+```logql
+{namespace="gitlab"}
+{namespace="longhorn-system"} |~ "(?i)warn|error|fail|degraded"
+{namespace="gitlab", pod=~"gitlab-webservice.*"}
+```
+
+Logs are shipped by Vector (`apps/betterstack/logs-values.yml`) into Loki (`apps/loki/values.yml`).
+
 ## Prometheus
 
 ### Login

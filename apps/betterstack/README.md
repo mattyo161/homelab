@@ -4,7 +4,7 @@ Covers three BetterStack products deployed to the homelab k3s cluster via ArgoCD
 
 | Product | What it does | ArgoCD App |
 |---|---|---|
-| **Logs** | Vector DaemonSet ships pod logs to BetterStack Logs | `betterstack-logs` |
+| **Logs** | Vector DaemonSet ships pod logs to Loki (query in Grafana) | `betterstack-logs` |
 | **Uptime** | Private location runner monitors internal `oue.home` services | `betterstack-uptime` |
 | **Metrics** | Prometheus remote_write ships cluster metrics to BetterStack Telemetry | _(via prometheus-stack)_ |
 
@@ -52,7 +52,9 @@ git commit -m "feat: add betterstack logs, uptime, and metrics integration"
 git push
 ```
 
-### Step 4 — Create secrets in the cluster
+### Step 4 — Create secrets in the cluster (uptime + metrics only)
+
+Logs now go to **Loki** in-cluster (no BetterStack logs token needed). Secrets are still required for uptime heartbeats and Prometheus remote_write metrics:
 
 ```bash
 ansible-playbook -i ansible/inventory/hosts.yml ansible/apps.yml \
@@ -60,11 +62,8 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/apps.yml \
   --ask-vault-pass
 ```
 
-This creates two Kubernetes Secrets:
-
 | Secret | Namespace | Keys |
 |---|---|---|
-| `betterstack-credentials` | `betterstack` | `BETTERSTACK_LOGS_TOKEN` |
 | `betterstack-heartbeats` | `betterstack` | `ARGOCD_HEARTBEAT_URL` (one key per monitored service) |
 | `betterstack-telemetry` | `monitoring` | `bearerToken` |
 
@@ -146,9 +145,15 @@ To monitor another internal service (e.g. Grafana):
 
 ---
 
+## Querying logs locally
+
+1. Ensure Loki is synced: `argocd app get loki`
+2. Open https://grafana.oue.home → **Explore** → datasource **Loki**
+3. See `apps/loki/README.md` for LogQL examples
+
 ## Reducing log volume
 
-Vector ships all pod logs by default. Infrastructure namespaces (kube-system, monitoring, longhorn, argocd, etc.) are usually the noisiest.
+Vector ships filtered pod logs to Loki. Infrastructure namespaces (kube-system, monitoring, longhorn, argocd, etc.) are usually the noisiest.
 
 **Namespace filter** — edit the `filter_noise` transform in `apps/betterstack/logs-values.yml`. Add or remove namespaces from the exclusion list, or switch to an allowlist if you only want a few apps:
 

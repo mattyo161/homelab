@@ -1,0 +1,14 @@
+---
+# mou-pi5 — worker node (agent)
+# Hardware: 4 CPU, 2.0 GiB RAM, aarch64
+# Role: ARM64-only workloads. No Longhorn replica scheduling.
+
+node_labels:
+  node-role: worker
+  role: arm64-only
+  kubernetes.io/arch: arm64
+
+node_taints:
+  - key: arch
+    value: arm64
+    effect: NoSchedule

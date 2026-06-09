@@ -284,6 +284,40 @@
               storageclass.kubernetes.io/is-default-class: "false"
         state: present
 
+    - name: Disable Longhorn scheduling on excluded nodes
+      tags: longhorn
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: longhorn.io/v1beta2
+        kind: Node
+        namespace: longhorn-system
+        name: "{{ item }}"
+        definition:
+          spec:
+            allowScheduling: false
+            evictionRequested: true
+        merge_type: merge
+      loop: "{{ longhorn_excluded_nodes }}"
+
+    - name: Disable Longhorn disk scheduling on mou-pi5
+      tags: longhorn
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - patch
+          - nodes.longhorn.io
+          - mou-pi5
+          - -n
+          - longhorn-system
+          - --type=merge
+          - -p
+          - '{"spec":{"allowScheduling":false,"evictionRequested":true,"disks":{"default-disk-d13531a75ae1003e":{"allowScheduling":false,"evictionRequested":true}}}}'
+      environment:
+        KUBECONFIG: "{{ kubeconfig }}"
+      delegate_to: localhost
+      changed_when: true
+      when: "'mou-pi5' in longhorn_excluded_nodes"
+
     # ------------------------------------------------------------------ #
     # ArgoCD
     # ------------------------------------------------------------------ #

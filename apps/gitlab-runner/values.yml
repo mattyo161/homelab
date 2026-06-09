@@ -20,8 +20,10 @@
 #   not in this values file which lives in git. Same pattern
 #   as your ansible vault secrets.
 
-# GitLab instance URL — must be reachable from runner pods
-gitlabUrl: https://gitlab.oue.home
+# GitLab API URL — use the in-cluster Workhorse service (port 8181), not the
+# external ingress. Runner pods hitting https://gitlab.oue.home via Traefik often
+# get Traefik's default cert (hostname mismatch) instead of the GitLab TLS cert.
+gitlabUrl: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181
 
 # =============================================================================
 # RUNNER CONFIGURATION (TOML embedded in YAML — unavoidable, see earlier note)
@@ -34,6 +36,9 @@ runners:
   runUntagged: true
   config: |
     [[runners]]
+      # Git clone, artifacts, and job traces also go through Workhorse (8181).
+      clone_url = "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181"
+
       # Use the Kubernetes executor — spawns a fresh pod per CI job.
       # This is the production pattern: isolated, ephemeral, auditable.
       [runners.kubernetes]

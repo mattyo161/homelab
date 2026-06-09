@@ -175,16 +175,22 @@ kubectl describe pvc <pvc-name> -n gitlab
 ```bash
 kubectl logs -n gitlab-runner \
   $(kubectl get pod -n gitlab-runner -ojsonpath='{.items[0].metadata.name}')
-# Usually: wrong token, or can't reach gitlab.oue.home from inside cluster
+# Usually: wrong token, or can't reach GitLab API from inside cluster
 ```
 
-**DNS resolution inside cluster:**
-The runner pods need to reach `gitlab.oue.home`. Since this is a
-`.home` domain, add it to CoreDNS or ensure your cluster nodes use
-a DNS server that resolves it (your home router/Pi-hole).
+**TLS error: certificate valid for `*.traefik.default`, not `gitlab.oue.home`:**
+The runner runs inside the cluster. It should use the internal GitLab Workhorse service, not the external Traefik ingress URL. `apps/gitlab-runner/values.yml` sets:
 
-Check with:
+```
+gitlabUrl: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181
+clone_url = "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181"
+```
+
+Humans still use `https://gitlab.oue.home` in the browser. Only runner ↔ GitLab API traffic uses the internal URL.
+
+Verify connectivity from a debug pod:
 ```bash
-kubectl run -it --rm debug --image=alpine --restart=Never -- \
-  nslookup gitlab.oue.home
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -n gitlab-runner -- \
+  curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/-/health
 ```

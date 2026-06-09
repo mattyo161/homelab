@@ -25,10 +25,43 @@ customConfig:
         .cluster = "homelab"
         .environment = "production"
 
+        # Normalize level when present (top-level field or JSON message body)
+        .log_level = downcase(string(.level) ?? string(.severity) ?? string(.lvl) ?? "")
+        if .log_level == "" {
+          parsed, err = parse_json(string!(.message))
+          if err == null && is_object(parsed) {
+            .log_level = downcase(string(parsed.level) ?? string(parsed.severity) ?? string(parsed.lvl) ?? "")
+          }
+        }
+
+    # Drop high-volume infrastructure namespaces (edit list to taste).
+    # To ship only specific apps, switch to an allowlist, e.g.:
+    #   includes(["dev", "prod", "gitlab"], string!(.kubernetes.pod_namespace))
+    # Per-pod opt-out: annotate with vector.dev/exclude: "true"
+    filter_noise:
+      type: filter
+      inputs: [add_cluster_meta]
+      condition: |
+        ns = string!(.kubernetes.pod_namespace)
+        level = string(.log_level) ?? ""
+        !includes([
+          # "kube-system",
+          # "kube-public",
+          # "kube-node-lease",
+          # "kube-flannel",
+          # "betterstack",
+          "longhorn-system",
+          # "argocd",
+          # "metallb-system",
+          # "cert-manager",
+          # "traefik",
+          # "monitoring",
+        ], ns) && level != "info"
+
   sinks:
     betterstack:
       type: http
-      inputs: [add_cluster_meta]
+      inputs: [filter_noise]
       uri: "https://in.logs.betterstack.com"
       encoding:
         codec: json

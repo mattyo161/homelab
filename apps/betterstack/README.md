@@ -146,6 +146,34 @@ To monitor another internal service (e.g. Grafana):
 
 ---
 
+## Reducing log volume
+
+Vector ships all pod logs by default. Infrastructure namespaces (kube-system, monitoring, longhorn, argocd, etc.) are usually the noisiest.
+
+**Namespace filter** — edit the `filter_noise` transform in `apps/betterstack/logs-values.yml`. Add or remove namespaces from the exclusion list, or switch to an allowlist if you only want a few apps:
+
+```yaml
+condition: includes(["dev", "prod", "gitlab"], string!(.kubernetes.pod_namespace))
+```
+
+**Log level** — `filter_noise` drops `info` when the level is in a structured field (`.level`, `.severity`) or JSON message body. Unstructured lines without a detectable level still ship. Edit the `level != "info"` check in `logs-values.yml` to change this.
+
+**Per-pod opt-out** — annotate a pod or deployment:
+
+```yaml
+metadata:
+  annotations:
+    vector.dev/exclude: "true"
+```
+
+After changes, sync ArgoCD or restart Vector:
+
+```bash
+kubectl rollout restart daemonset/betterstack-logs-vector -n betterstack
+```
+
+---
+
 ## Troubleshooting
 
 ### Logs not appearing in BetterStack

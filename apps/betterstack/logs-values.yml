@@ -21,6 +21,7 @@ customConfig:
       type: remap
       inputs: [kubernetes_logs]
       source: |
+        .dt = del(.timestamp)
         .cluster = "homelab"
         .environment = "production"
 

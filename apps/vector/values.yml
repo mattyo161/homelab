@@ -2,7 +2,7 @@
 # Chart: vector from https://helm.vector.dev
 # Docs: https://vector.dev/docs/setup/installation/package-managers/helm/
 #
-# Prerequisite: the 'betterstack-credentials' Secret must exist in the betterstack
+# Prerequisite: the 'betterstack-credentials' Secret must exist in the vector
 # namespace before ArgoCD syncs this app. See ansible/apps.yml for creation.
 # Loki must be running in the monitoring namespace before logs arrive.
 # See apps/loki/values.yml and apps/argocd/apps/loki.yml.

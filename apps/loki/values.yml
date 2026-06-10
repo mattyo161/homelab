@@ -2,7 +2,7 @@
 # Chart: grafana/loki
 # Repo: https://grafana.github.io/helm-charts
 #
-# Receives logs from the Vector DaemonSet (apps/betterstack/logs-values.yml).
+# Receives logs from the Vector DaemonSet (apps/vector/values.yml).
 # Query in Grafana → Explore → Loki.
 
 deploymentMode: SingleBinary

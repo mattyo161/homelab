@@ -395,6 +395,17 @@
           metadata:
             name: betterstack
 
+    - name: Create vector namespace
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: vector
+
     - name: Create BetterStack logs credentials secret
       tags: betterstack-secrets
       kubernetes.core.k8s:
@@ -405,7 +416,7 @@
           kind: Secret
           metadata:
             name: betterstack-credentials
-            namespace: betterstack
+            namespace: vector
           stringData:
             BETTERSTACK_LOGS_TOKEN: "{{ betterstack_logs_token }}"
 

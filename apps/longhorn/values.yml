@@ -19,7 +19,13 @@ defaultSettings:
   replicaAutoBalance: least-effort
   # Nodes excluded from scheduling are enforced by ansible/apps.yml
   # (longhorn_excluded_nodes in group_vars/k3s_cluster/main.yml).
-  
+
+# StorageClass replica count — this (not defaultReplicaCount above) controls
+# volumes created via PVC. Chart default is 3; only mini4/mini5 have large
+# schedulable disks, so 3 replicas would leave every new volume degraded.
+persistence:
+  defaultClassReplicaCount: 2
+
 # Ingress for the Longhorn UI
 ingress:
   enabled: true

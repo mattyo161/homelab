@@ -10,7 +10,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/mattyo161/homelab.git
-    targetRevision: ansible-k8s-core
+    targetRevision: HEAD
     path: apps/betterstack/uptime
   destination:
     server: https://kubernetes.default.svc

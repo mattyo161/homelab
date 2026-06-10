@@ -17,7 +17,7 @@ spec:
         valueFiles:
           - $values/apps/prometheus-stack/values.yml
     - repoURL: https://github.com/mattyo161/homelab.git
-      targetRevision: ansible-k8s-core
+      targetRevision: HEAD
       ref: values
   destination:
     server: https://kubernetes.default.svc

@@ -23,7 +23,7 @@ spec:
   source:
     # Update this to your actual repo URL after pushing
     repoURL: https://github.com/mattyo161/homelab.git
-    targetRevision: ansible-k8s-core
+    targetRevision: HEAD
     path: apps/argocd/apps
   destination:
     server: https://kubernetes.default.svc

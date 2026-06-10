@@ -14,6 +14,7 @@
 python  = "3.14.3"
 helm    = "3.20.1"  # kubernetes.core helm module requires <4.0.0; revisit when collection adds Helm 4 support
 kubectl = "1.35.2"
+argocd  = "3.2.8"
 
 [env]
 # Create (if missing) and activate a project-local venv at .venv/.

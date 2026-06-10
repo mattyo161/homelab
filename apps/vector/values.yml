@@ -96,6 +96,9 @@ envFrom:
   - secretRef:
       name: betterstack-credentials
 
+service:
+  enabled: false
+
 # Resource limits for the DaemonSet pods
 resources:
   requests:

@@ -57,7 +57,7 @@ jobs:
 
             echo "🔍 Validating $app_name ($chart_name@$chart_version)..."
 
-            helm repo add "$app_name" "$chart_repo" --force-update -q
+            helm repo add "$app_name" "$chart_repo" --force-update
             helm repo update "$app_name"
 
             if helm template "$release_name" "$app_name/$chart_name" \

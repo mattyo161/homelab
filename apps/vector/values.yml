@@ -72,11 +72,11 @@ customConfig:
         codec: text
       labels:
         cluster: homelab
-        namespace: "{{ kubernetes.pod_namespace }}"
-        pod: "{{ kubernetes.pod_name }}"
-        container: "{{ kubernetes.container_name }}"
-        node: "{{ kubernetes.pod_node_name }}"
-        log_level: "{{ log_level }}"
+        namespace: '{{`{{ kubernetes.pod_namespace }}`}}'
+        pod: '{{`{{ kubernetes.pod_name }}`}}'
+        container: '{{`{{ kubernetes.container_name }}`}}'
+        node: '{{`{{ kubernetes.pod_node_name }}`}}'
+        log_level: '{{`{{ log_level }}`}}'
 
     betterstack:
       type: http

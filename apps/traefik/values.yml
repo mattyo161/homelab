@@ -62,8 +62,10 @@ providers:
 logs:
   general:
     level: INFO
+    format: json
   access:
     enabled: true
+    format: json
 
 # Resource limits — conservative for homelab
 resources:

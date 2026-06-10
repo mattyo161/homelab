@@ -1,0 +1,56 @@
+---
+# Heartbeat-based uptime monitoring for internal oue.home services.
+#
+# BetterStack does not provide a private location runner image. For homelab use,
+# heartbeat monitors are the right approach: this CronJob pings an internal service
+# and then sends a heartbeat to BetterStack. If the cluster goes down, heartbeats
+# stop and BetterStack alerts after the configured period.
+#
+# Setup per monitored service:
+#   1. In BetterStack Uptime > Heartbeat monitors, create a new heartbeat monitor
+#      - Set the period to 2 minutes, grace to 1 minute
+#      - Copy the heartbeat URL (looks like: https://uptime.betterstack.com/api/v1/heartbeat/<token>)
+#   2. Add the URL to ansible-vault as betterstack_heartbeat_<name>_url
+#   3. Add a new Secret key and duplicate this CronJob with the new service URL
+#
+# To add more services: copy this CronJob, change the name, SERVICE_URL, and HEARTBEAT_URL.
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: heartbeat-argocd
+  namespace: betterstack
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: heartbeat
+              image: curlimages/curl:latest
+              env:
+                - name: SERVICE_URL
+                  value: "https://argocd.oue.home"
+                - name: HEARTBEAT_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: betterstack-heartbeats
+                      key: ARGOCD_HEARTBEAT_URL
+              command:
+                - sh
+                - -c
+                - |
+                  if curl -sf --max-time 10 -o /dev/null -k "$SERVICE_URL"; then
+                    curl -sf "$HEARTBEAT_URL"
+                  fi
+              resources:
+                requests:
+                  memory: 8Mi
+                  cpu: 5m
+                limits:
+                  memory: 32Mi
+                  cpu: 50m

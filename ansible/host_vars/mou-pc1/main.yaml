@@ -1,0 +1,8 @@
+---
+
+node_labels:
+  node-role: worker
+  role: gitlab-app      # GitLab Webservice, Sidekiq, Registry land here
+node_taints: []
+# No taint — other infrastructure pods legitimately run here too.
+# Affinity rules in Helm values are sufficient to direct GitLab pods here.

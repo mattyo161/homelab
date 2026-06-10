@@ -1,0 +1,115 @@
+# Vector Helm values — ships Kubernetes pod logs to Loki and BetterStack Logs
+# Chart: vector from https://helm.vector.dev
+# Docs: https://vector.dev/docs/setup/installation/package-managers/helm/
+#
+# Prerequisite: the 'betterstack-credentials' Secret must exist in the vector
+# namespace before ArgoCD syncs this app. See ansible/apps.yml for creation.
+# Loki must be running in the monitoring namespace before logs arrive.
+# See apps/loki/values.yml and apps/argocd/apps/loki.yml.
+
+role: Agent  # DaemonSet — one pod per node, tails all pod logs
+
+customConfig:
+  data_dir: /vector-data-dir
+
+  sources:
+    kubernetes_logs:
+      type: kubernetes_logs
+      # Annotate pods with vector.dev/exclude: "true" to skip them
+
+  transforms:
+    # Enrich with cluster metadata
+    add_cluster_meta:
+      type: remap
+      inputs: [kubernetes_logs]
+      source: |
+        .dt = del(.timestamp)
+        .cluster = "homelab"
+        .environment = "production"
+
+        # Normalize level when present (top-level field or JSON message body)
+        .log_level = downcase(string(.level) ?? string(.severity) ?? string(.lvl) ?? "")
+        if .log_level == "" {
+          parsed, err = parse_json(string!(.message))
+          if err == null && is_object(parsed) {
+            .log_level = downcase(string(parsed.level) ?? string(parsed.severity) ?? string(parsed.lvl) ?? "")
+          }
+        }
+
+    # BetterStack only — Loki receives the full stream via add_cluster_meta (no filter).
+    # Drop high-volume infrastructure namespaces (edit list to taste).
+    # To ship only specific apps, switch to an allowlist, e.g.:
+    #   includes(["dev", "prod", "gitlab"], string!(.kubernetes.pod_namespace))
+    # Per-pod opt-out: annotate with vector.dev/exclude: "true"
+    filter_noise:
+      type: filter
+      inputs: [add_cluster_meta]
+      condition: |
+        ns = string!(.kubernetes.pod_namespace)
+        level = string(.log_level) ?? ""
+        !includes([
+          # "kube-system",
+          # "kube-public",
+          # "kube-node-lease",
+          # "kube-flannel",
+          # "betterstack",
+          "longhorn-system",
+          # "argocd",
+          # "metallb-system",
+          # "cert-manager",
+          # "traefik",
+          # "monitoring",
+        ], ns) && level != "info"
+
+  sinks:
+    loki:
+      type: loki
+      inputs: [add_cluster_meta]
+      endpoint: http://loki.monitoring.svc.cluster.local:3100
+      out_of_order_action: accept
+      remove_timestamp: true
+      encoding:
+        codec: text
+      labels:
+        cluster: homelab
+        namespace: '{{`{{ kubernetes.pod_namespace }}`}}'
+        pod: '{{`{{ kubernetes.pod_name }}`}}'
+        container: '{{`{{ kubernetes.container_name }}`}}'
+        node: '{{`{{ kubernetes.pod_node_name }}`}}'
+        log_level: '{{`{{ log_level }}`}}'
+
+    betterstack:
+      type: http
+      inputs: [filter_noise]
+      uri: "https://in.logs.betterstack.com"
+      encoding:
+        codec: json
+      auth:
+        strategy: bearer
+        token: "$BETTERSTACK_LOGS_TOKEN"
+      batch:
+        timeout_secs: 10
+      request:
+        retry_max_duration_secs: 30
+
+envFrom:
+  - secretRef:
+      name: betterstack-credentials
+
+service:
+  enabled: false
+
+# Resource limits for the DaemonSet pods
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 50m
+  limits:
+    memory: 256Mi
+    cpu: 200m
+
+# Persist Vector's position file so it doesn't re-ship logs after restarts
+persistence:
+  enabled: true
+  storageClassName: longhorn
+  size: 1Gi

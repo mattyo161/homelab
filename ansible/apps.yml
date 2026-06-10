@@ -284,6 +284,40 @@
               storageclass.kubernetes.io/is-default-class: "false"
         state: present
 
+    - name: Disable Longhorn scheduling on excluded nodes
+      tags: longhorn
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: longhorn.io/v1beta2
+        kind: Node
+        namespace: longhorn-system
+        name: "{{ item }}"
+        definition:
+          spec:
+            allowScheduling: false
+            evictionRequested: true
+        merge_type: merge
+      loop: "{{ longhorn_excluded_nodes }}"
+
+    - name: Disable Longhorn disk scheduling on mou-pi5
+      tags: longhorn
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - patch
+          - nodes.longhorn.io
+          - mou-pi5
+          - -n
+          - longhorn-system
+          - --type=merge
+          - -p
+          - '{"spec":{"allowScheduling":false,"evictionRequested":true,"disks":{"default-disk-d13531a75ae1003e":{"allowScheduling":false,"evictionRequested":true}}}}'
+      environment:
+        KUBECONFIG: "{{ kubeconfig }}"
+      delegate_to: localhost
+      changed_when: true
+      when: "'mou-pi5' in longhorn_excluded_nodes"
+
     # ------------------------------------------------------------------ #
     # ArgoCD
     # ------------------------------------------------------------------ #
@@ -340,12 +374,97 @@
     # ------------------------------------------------------------------ #
     # App of Apps — ArgoCD now takes over from here
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    # BetterStack secrets
+    # Run: ansible-playbook -i inventory/hosts.yml apps.yml --tags betterstack-secrets
+    #
+    # Required ansible-vault variables (add to inventory/group_vars/k3s_cluster/vault.yml):
+    #   betterstack_logs_token              — BetterStack Logs > Source > token
+    #   betterstack_telemetry_token         — BetterStack Telemetry > Connect > bearer token
+    #   betterstack_heartbeat_argocd_url    — BetterStack Uptime > Heartbeat monitors > argocd > URL
+    #   (add one betterstack_heartbeat_<name>_url per monitored service)
+    # ------------------------------------------------------------------ #
+    - name: Create betterstack namespace
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: betterstack
+
+    - name: Create vector namespace
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: vector
+
+    - name: Create BetterStack logs credentials secret
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: betterstack-credentials
+            namespace: vector
+          stringData:
+            BETTERSTACK_LOGS_TOKEN: "{{ betterstack_logs_token }}"
+
+    - name: Create BetterStack heartbeat URLs secret
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: betterstack-heartbeats
+            namespace: betterstack
+          stringData:
+            ARGOCD_HEARTBEAT_URL: "{{ betterstack_heartbeat_argocd_url }}"
+
+    - name: Create BetterStack telemetry secret (used by Prometheus remote_write)
+      tags: betterstack-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: betterstack-telemetry
+            namespace: monitoring
+          stringData:
+            bearerToken: "{{ betterstack_telemetry_token }}"
+
+    # ------------------------------------------------------------------ #
+    # App of Apps — ArgoCD now takes over from here
+    # ------------------------------------------------------------------ #
     - name: Apply App of Apps root Application
       tags: argocd
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
         state: present
         src: "{{ apps_dir }}/argocd/app-of-apps.yml"
+
+    - name: Apply ArgoCD PDBs
+      tags: argocd
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        src: "{{ apps_dir }}/argocd/pdb.yml"
+
 
     - name: Get ArgoCD initial admin password
       tags: argocd

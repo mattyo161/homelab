@@ -1,0 +1,141 @@
+# GitLab Runner Helm values
+# Chart: gitlab/gitlab-runner
+#
+# SETUP SEQUENCE — do this before ArgoCD syncs this app:
+#
+#   1. GitLab is running at https://gitlab.oue.home
+#   2. Admin Area → CI/CD → Runners → New instance runner
+#   3. Copy the runner authentication token (starts with glrt-)
+#   4. Create a Kubernetes secret with the token:
+#
+#      kubectl create secret generic gitlab-runner-secret \
+#        --namespace gitlab-runner \
+#        --from-literal=runner-registration-token="" \
+#        --from-literal=runner-token="glrt-PASTE_YOUR_TOKEN_HERE"
+#
+#   5. Then let ArgoCD sync this app (or sync manually).
+#
+# WHY A SECRET NOT A VALUE:
+#   The runner token is a credential. It goes in a k8s secret,
+#   not in this values file which lives in git. Same pattern
+#   as your ansible vault secrets.
+
+# GitLab API URL — use the in-cluster Workhorse service (port 8181), not the
+# external ingress. Runner pods hitting https://gitlab.oue.home via Traefik often
+# get Traefik's default cert (hostname mismatch) instead of the GitLab TLS cert.
+gitlabUrl: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181
+
+# =============================================================================
+# RUNNER CONFIGURATION (TOML embedded in YAML — unavoidable, see earlier note)
+# This is the only TOML you'll write. Everything else is YAML.
+# =============================================================================
+runners:
+  # Reference the secret created in step 4 above (must be under runners:, not top-level)
+  secret: gitlab-runner-secret
+  tags: "privileged-runner,k3s-homelab"
+  runUntagged: true
+  config: |
+    [[runners]]
+      # Git clone, artifacts, and job traces also go through Workhorse (8181).
+      clone_url = "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181"
+
+      # Use the Kubernetes executor — spawns a fresh pod per CI job.
+      # This is the production pattern: isolated, ephemeral, auditable.
+      [runners.kubernetes]
+        namespace = "gitlab-runner"
+        image = "python:3.13-slim"
+
+        # ----------------------------------------------------------------
+        # PRIVILEGED MODE
+        # Required for your integration tests that need Docker-in-Docker
+        # and cgroup mounts (systemd containers).
+        #
+        # Security note: privileged pods can escape to the host.
+        # Acceptable on your homelab. In production you'd scope this
+        # to specific runner tags (see tags below) so only jobs that
+        # explicitly request it get privileged execution.
+        # ----------------------------------------------------------------
+        privileged = true
+
+        # Host path mounts for cgroup and modules (needed by systemd containers)
+        [[runners.kubernetes.volumes.host_path]]
+          name = "cgroup"
+          mount_path = "/sys/fs/cgroup"
+          host_path = "/sys/fs/cgroup"
+          read_only = false
+
+        [[runners.kubernetes.volumes.host_path]]
+          name = "modules"
+          mount_path = "/lib/modules"
+          host_path = "/lib/modules"
+          read_only = true
+
+        [[runners.kubernetes.volumes.host_path]]
+          name = "bpf"
+          mount_path = "/sys/fs/bpf"
+          host_path = "/sys/fs/bpf"
+          read_only = false
+
+        # Resource limits per job pod
+        # These are defaults — jobs can override with their own resource blocks
+        [runners.kubernetes.pod_labels]
+          "app.kubernetes.io/managed-by" = "gitlab-runner"
+
+  # Cache storage — uses MinIO from your GitLab install
+  cache:
+    secretName: gitlab-minio-secret   # created post-GitLab-install, see README below
+    # After GitLab is running, create this secret:
+    #   kubectl create secret generic gitlab-minio-secret \
+    #     --namespace gitlab-runner \
+    #     --from-literal=accesskey="$(kubectl get secret gitlab-minio-secret \
+    #       -n gitlab -ojsonpath='{.data.accesskey}' | base64 -d)" \
+    #     --from-literal=secretkey="$(kubectl get secret gitlab-minio-secret \
+    #       -n gitlab -ojsonpath='{.data.secretkey}' | base64 -d)"
+
+# =============================================================================
+# RUNNER RESOURCE LIMITS (the runner manager pod itself, not job pods)
+# =============================================================================
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# =============================================================================
+# NODE PLACEMENT
+# Runner manager pod: any worker is fine (it's lightweight)
+# Job pods: prefer mini3 and mini5 (free CPU, reasonable RAM)
+#           avoid mini4 (reserved for GitLab core)
+#           avoid Pi (ARM64)
+# =============================================================================
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+                - amd64
+      - weight: 50
+        preference:
+          matchExpressions:
+            - key: role
+              operator: NotIn
+              values:
+                - gitlab
+
+# =============================================================================
+# RBAC
+# Runner needs permission to create/delete pods in gitlab-runner namespace
+# =============================================================================
+rbac:
+  create: true
+  rules:
+    - resources: ["pods", "pods/exec", "pods/attach", "secrets", "configmaps"]
+      verbs: ["get", "list", "watch", "create", "patch", "delete", "update"]
+    - resources: ["pods/log"]
+      verbs: ["get", "list", "watch"]

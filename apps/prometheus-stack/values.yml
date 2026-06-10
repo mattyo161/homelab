@@ -31,11 +31,48 @@ grafana:
   # Default dashboards for Kubernetes
   defaultDashboardsEnabled: true
 
+  # Loki log store (deployed by apps/argocd/apps/loki.yml)
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      url: http://loki.monitoring.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        maxLines: 1000
+
 # --- Prometheus ---
 prometheus:
   prometheusSpec:
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: node-role
+                  operator: In
+                  values:
+                    - worker  # make sure that prometheus is only scheduled on worker nodes
     # How long to retain metrics data
-    retention: 30d
+    retention: 15d
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 200m
+      limits:
+        memory: 1.5Gi
+        cpu: 500m
+
+    additionalScrapeConfigs:
+      - job_name: gitlab
+        metrics_path: /-/metrics
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true   # selfsigned cert
+        static_configs:
+          - targets: ['gitlab.oue.home']
 
     storageSpec:
       volumeClaimTemplate:
@@ -45,6 +82,16 @@ prometheus:
           resources:
             requests:
               storage: 20Gi
+
+    # Ship metrics to BetterStack Telemetry
+    # Token stored in the betterstack-telemetry Secret (created by ansible/apps.yml)
+    # Get your endpoint URL from BetterStack > Telemetry > Connect
+    remoteWrite:
+      - url: "https://in.telemetry.betterstack.com/prometheus/write"
+        authorization:
+          credentials:
+            name: betterstack-telemetry
+            key: bearerToken
 
   ingress:
     enabled: true

@@ -1,0 +1,30 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vector
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.vector.dev
+      chart: vector
+      targetRevision: "0.36.0"
+      helm:
+        releaseName: vector
+        valueFiles:
+          - $values/apps/vector/values.yml
+    - repoURL: https://github.com/mattyo161/homelab.git
+      targetRevision: ansible-k8s-core
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vector
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

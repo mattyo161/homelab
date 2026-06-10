@@ -1,0 +1,23 @@
+---
+# mou-mini4 — worker node (agent)
+# Hardware: 4 CPU, 15.5 GiB RAM
+# Role: primary workload node, GitLab storage tier
+#
+# Best worker node by RAM. Already running:
+#   - ArgoCD core (application-controller, applicationset, redis)
+#   - cert-manager
+#   - Longhorn manager + instance-manager (volume I/O processed here)
+#   - MetalLB
+#   - Alertmanager, Prometheus operator, kube-state-metrics
+#
+# Designated for GitLab stateful components because Longhorn
+# instance-manager is already here — volume I/O stays local
+# rather than crossing the network.
+
+node_labels:
+  node-role: worker
+  role: gitlab-storage      # GitLab Gitaly, PostgreSQL, MinIO, Redis land here
+
+node_taints: []
+# No taint — other infrastructure pods legitimately run here too.
+# Affinity rules in Helm values are sufficient to direct GitLab pods here.

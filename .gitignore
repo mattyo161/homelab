@@ -1,0 +1,5 @@
+# Python virtual environment (created by mise via _.python.venv in .mise.toml)
+.venv/
+
+# macOS metadata
+.DS_Store

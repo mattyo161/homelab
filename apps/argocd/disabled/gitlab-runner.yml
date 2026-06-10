@@ -1,0 +1,33 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab-runner
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.gitlab.io/
+      chart: gitlab-runner
+      targetRevision: "0.74.0"   # keep in sync with GitLab version above
+      helm:
+        releaseName: gitlab-runner
+        valueFiles:
+          - $values/apps/gitlab-runner/values.yml
+    - repoURL: https://github.com/mattyo161/homelab.git
+      targetRevision: ansible-k8s-core
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitlab-runner
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  # IMPORTANT: deploy GitLab first, then register a runner token,
+  # then add that token as a CI variable before syncing this app.
+  # See apps/gitlab-runner/values.yml for instructions.

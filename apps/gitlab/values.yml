@@ -1,0 +1,120 @@
+# GitLab Helm values — minimal working config
+# Chart: gitlab/gitlab 9.10.3 → GitLab 18.10.3
+# Start minimal, validate sync, then add affinity/resources/storage config.
+
+global:
+  edition: ce
+  hosts:
+    domain: oue.home
+    https: true
+  ingress:
+    class: traefik
+    configureCertmanager: false
+    tls:
+      enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+
+## Installation of certmananger.
+## This value replaces `certmanager.install` to allow certmanager schema validation to pass.
+## See dependencies in Chart.yaml for current version
+installCertmanager: false
+
+certmanager:
+  install: false
+  installCRDs: false
+  enabled: false
+
+nginx-ingress:
+  enabled: false
+
+prometheus:
+  install: false
+
+upgradeCheck:
+  enabled: false
+
+gitlab:
+  webservice:
+    replicaCount: 1
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-app
+  sidekiq:
+    replicaCount: 1
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-app
+
+  gitaly:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-storage
+
+  gitlab-shell:
+    replicaCount: 1
+
+  kas:
+    enabled: false   # disabled — re-enable when needed
+
+postgresql:
+  primary:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-storage
+
+redis:
+  master:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: role
+                  operator: In
+                  values:
+                    - gitlab-storage
+
+minio:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: role
+                operator: In
+                values:
+                  - gitlab-storage
+
+registry:
+  hpa:
+    minReplicas: 1
+    maxReplicas: 1
+
+gitlab-runner:
+  install: false    # managed separately once runner token is set up

@@ -62,8 +62,16 @@ providers:
 logs:
   general:
     level: INFO
+    format: json
   access:
     enabled: true
+    format: json
+    fields:
+      headers:
+        defaultMode: keep
+        names:
+          User-Agent: keep
+          Referer: keep
 
 # Resource limits — conservative for homelab
 resources:

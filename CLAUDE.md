@@ -37,8 +37,9 @@ ansible/
 - Branch off `main`, make changes, open a PR
 - GHA runs `helm template` + `kubeconform` on every PR automatically
 - ArgoCD auto-syncs from `main` (`HEAD`) after merge
-- To test a change against the live cluster before merging: edit the specific
-  ArgoCD child app in the UI and temporarily set `targetRevision` to your branch
+- To test a change against the live cluster before merging: pause app-of-apps
+  auto-sync, then point the child app's `targetRevision` at your branch — see
+  [the branch-testing runbook](docs/runbooks/testing-changes-on-a-branch.md)
 
 ## Templating layers — order matters
 

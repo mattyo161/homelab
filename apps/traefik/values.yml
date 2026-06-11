@@ -31,6 +31,10 @@ ports:
           to: websecure
           scheme: https
           permanent: true
+          # Low priority lets apps that explicitly route on the web
+          # entrypoint (e.g. plantuml) serve HTTP without redirecting.
+          # Apps with websecure-only routers still get redirected.
+          priority: 1
   websecure:
     port: 8443
     expose:

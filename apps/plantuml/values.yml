@@ -7,7 +7,9 @@ ingress:
   ingressClassName: traefik
   annotations:
     cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # web + websecure: allow plain HTTP for clients that can't handle the
+    # self-signed cert (e.g. Obsidian plugins)
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
   hosts:
     - plantuml.oue.home
   path: /

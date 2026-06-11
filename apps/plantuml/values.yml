@@ -18,16 +18,41 @@ ingress:
       hosts:
         - plantuml.oue.home
 
+# Probes render a real diagram (/png) which is slow on a cold JVM —
+# generous delays/timeouts prevent restart loops on slower nodes
+livenessProbe:
+  httpGet:
+    path: /png
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 5
+readinessProbe:
+  httpGet:
+    path: /png
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 10
+  failureThreshold: 3
+
 autoscaling:
   enabled: true
   minReplicas: 1
   maxReplicas: 4
   targetCPUUtilizationPercentage: 60
+  # Don't scale on short-lived spikes (e.g. JVM startup)
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+    scaleDown:
+      stabilizationWindowSeconds: 120
 
 resources:
   requests:
     memory: "256Mi"
-    cpu: "250m"
+    cpu: "500m"
   limits:
     memory: "512Mi"
-    cpu: "500m"
+    cpu: "1000m"

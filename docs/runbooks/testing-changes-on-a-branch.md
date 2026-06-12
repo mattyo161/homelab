@@ -48,8 +48,10 @@ For raw-manifest apps with a single `spec.source`, patch
 `/spec/source/targetRevision` instead.
 
 ```bash
-kubectl patch application <app> -n argocd --type json \
-  -p '[{"op":"replace","path":"/spec/sources/1/targetRevision","value":"fix/my-app-change"}]'
+app=plantuml
+branch="$(git rev-parse --abbrev-ref HEAD)"
+kubectl patch application "${app}" -n argocd --type json \
+  -p '[{"op":"replace","path":"/spec/sources/1/targetRevision","value":"'"${branch}"'"}]'
 ```
 
 ### 4. Sync and verify
@@ -57,17 +59,18 @@ kubectl patch application <app> -n argocd --type json \
 ArgoCD picks up the change on its next refresh; to force it:
 
 ```bash
-kubectl annotate application <app> -n argocd \
+kubectl annotate application "${app}" -n argocd \
   argocd.argoproj.io/refresh=normal --overwrite
 ```
 
 Then verify:
 
 ```bash
-kubectl get application <app> -n argocd \
+namespace=plantuml
+kubectl get application "${app}" -n argocd \
   -o jsonpath='{.status.sync.status} {.status.health.status}'
-kubectl get pods -n <namespace>
-kubectl get events -n <namespace> --sort-by='.lastTimestamp' | tail -20
+kubectl get pods -n "${namespace}"
+kubectl get events -n "${namespace}" --sort-by='.lastTimestamp' | tail -20
 ```
 
 Iterate: push more commits to the branch and re-trigger the refresh until
@@ -97,7 +100,7 @@ restarted.
 
 ```bash
 # Child app should be back on HEAD
-kubectl get application <app> -n argocd \
+kubectl get application "${app}" -n argocd \
   -o jsonpath='{.spec.sources[1].targetRevision}'
 
 # Everything Synced / Healthy

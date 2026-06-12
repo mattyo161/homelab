@@ -18,8 +18,8 @@ ingress:
         - plantuml.oue.home
       secretName: plantuml-tls
 
-# Probes render a real diagram (/png) which is slow on a cold JVM —
-# generous delays/timeouts prevent restart loops on slower nodes
+# Probes render the demo diagram via /svg (lighter than /png rasterization)
+# but still slow on a cold JVM — generous delays/timeouts prevent restart loops
 livenessProbe:
   httpGet:
     path: /svg/SyfFKj2rKt3CoKnELR1Io4ZDoSa70000

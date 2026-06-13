@@ -1,6 +1,6 @@
 # PlantUML Server Helm values
 # Chart: stevehipwell/plantuml
-# Repo: https://stevehipwell.github.io/helm-charts/
+# Repo: https://github.com/stevehipwell/helm-charts/tree/main/charts/plantuml
 
 ingress:
   enabled: true
@@ -18,29 +18,30 @@ ingress:
         - plantuml.oue.home
       secretName: plantuml-tls
 
-# Probes render a real diagram (/png) which is slow on a cold JVM —
-# generous delays/timeouts prevent restart loops on slower nodes
+# Probes render the demo diagram via /svg (lighter than /png rasterization)
+# but still slow on a cold JVM — generous delays/timeouts prevent restart loops
 livenessProbe:
   httpGet:
-    path: /png
-    port: http
-  initialDelaySeconds: 60
-  periodSeconds: 30
-  timeoutSeconds: 10
-  failureThreshold: 5
+    path: /svg/SyfFKj2rKt3CoKnELR1Io4ZDoSa70000
+    port: 8080
+  initialDelaySeconds: 30  # give JVM more time to start
+  periodSeconds: 30        # check every 30s
+  failureThreshold: 5      # must fail 5 times before marked unready and restarted
+  timeoutSeconds: 10       # timeout after 10s
 readinessProbe:
   httpGet:
-    path: /png
-    port: http
-  initialDelaySeconds: 20
-  periodSeconds: 10
-  timeoutSeconds: 10
-  failureThreshold: 3
+    path: /svg/SyfFKj2rKt3CoKnELR1Io4ZDoSa70000
+    port: 8080
+  initialDelaySeconds: 15  # wait 15s before first check
+  periodSeconds: 5         # check every 5s
+  failureThreshold: 3      # must fail 3 times before marked unready
+  successThreshold: 1      # only needs 1 success to be marked ready
+  timeoutSeconds: 10       # timeout after 10s
 
 autoscaling:
   enabled: true
-  minReplicas: 1
-  maxReplicas: 4
+  minReplicas: 2
+  maxReplicas: 6
   targetCPUUtilizationPercentage: 60
   # Don't scale on short-lived spikes (e.g. JVM startup)
   behavior:
@@ -52,7 +53,7 @@ autoscaling:
 resources:
   requests:
     memory: "256Mi"
-    cpu: "500m"
+    cpu: "250m"
   limits:
     memory: "512Mi"
-    cpu: "1000m"
+    cpu: "500m"

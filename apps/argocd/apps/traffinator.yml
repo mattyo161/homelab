@@ -1,0 +1,33 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traffinator
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Helm chart published as an OCI artifact to GHCR (from the traffinator repo).
+    # Bump targetRevision to deploy a new release — it also selects the app images.
+    - repoURL: ghcr.io/mattyo161/charts
+      chart: traffinator
+      targetRevision: "0.3.0"
+      helm:
+        releaseName: traffinator
+        valueFiles:
+          - $values/apps/traffinator/values.yml
+    # Values come from this homelab repo, tracking main
+    - repoURL: https://github.com/mattyo161/homelab.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traffinator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

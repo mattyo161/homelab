@@ -1,0 +1,38 @@
+# Traffinator — predictive commute-time analyzer (Django API + React SPA + Postgres)
+# Chart: oci://ghcr.io/mattyo161/charts/traffinator (published from the
+# traffinator repo's release CI).
+#
+# Deploying a new release is a single knob: bump `targetRevision` in
+# apps/argocd/apps/traffinator.yml. That selects the chart version, and the
+# chart defaults each image tag to its appVersion — so the matching app images
+# come along automatically. (Image tags are intentionally not overridden here.)
+#
+# Secrets are created by ansible/apps.yml (tag: traffinator-secrets) in the
+# `traffinator` namespace and referenced via secrets.existingSecret. The chart's
+# built-in secret generation uses a Helm `lookup` that ArgoCD's `helm template`
+# can't honor, so it would regenerate the Django key / Postgres password on
+# every sync — hence the external secret.
+
+secrets:
+  existingSecret: traffinator-secrets
+
+ingress:
+  enabled: true
+  className: traefik
+  host: traffinator.oue.home
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+  tls:
+    enabled: true
+    secretName: traffinator-tls
+
+# Bundled Postgres on Longhorn — the deployable-today path. To switch to
+# CloudNativePG later: set postgres.enabled=false and point the backend at the
+# CNPG app secret via externalDatabase.existingSecret (see chart README).
+postgres:
+  enabled: true
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 5Gi

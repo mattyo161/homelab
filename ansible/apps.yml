@@ -449,6 +449,57 @@
             bearerToken: "{{ betterstack_telemetry_token }}"
 
     # ------------------------------------------------------------------ #
+    # Traffinator secrets
+    # Run: ansible-playbook -i inventory/hosts.yml apps.yml --tags traffinator-secrets
+    #
+    # The chart auto-generates DJANGO_SECRET_KEY and the Postgres password via a
+    # Helm `lookup`, which ArgoCD's `helm template` can't honor — it would
+    # regenerate them on every sync. We create the Secret here and point the
+    # chart at it with secrets.existingSecret. Both the backend (envFrom) and the
+    # bundled Postgres pod (POSTGRES_PASSWORD) read from this Secret.
+    #
+    # Required ansible-vault variables (add to vault.yml):
+    #   traffinator_django_secret_key    — 50 random alphanumerics
+    #   traffinator_postgres_password    — 24 random alphanumerics
+    # Optional (omit to configure in-app / fall back to public OSRM routing):
+    #   traffinator_google_maps_api_key
+    #   traffinator_google_oauth_client_id
+    #   traffinator_apple_oauth_client_id
+    #   traffinator_openrouteservice_api_key
+    # ------------------------------------------------------------------ #
+    - name: Create traffinator namespace
+      tags: traffinator-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: traffinator
+
+    - name: Create traffinator credentials secret
+      tags: traffinator-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: traffinator-secrets
+            namespace: traffinator
+          stringData:
+            DJANGO_SECRET_KEY: "{{ traffinator_django_secret_key }}"
+            POSTGRES_PASSWORD: "{{ traffinator_postgres_password }}"
+            # Bundled Postgres service is <release>-postgres on :5432, db/user "commute"
+            DATABASE_URL: "postgresql://commute:{{ traffinator_postgres_password }}@traffinator-postgres:5432/commute"
+            GOOGLE_MAPS_API_KEY: "{{ traffinator_google_maps_api_key | default('') }}"
+            GOOGLE_OAUTH_CLIENT_ID: "{{ traffinator_google_oauth_client_id | default('') }}"
+            APPLE_OAUTH_CLIENT_ID: "{{ traffinator_apple_oauth_client_id | default('') }}"
+            OPENROUTESERVICE_API_KEY: "{{ traffinator_openrouteservice_api_key | default('') }}"
+
+    # ------------------------------------------------------------------ #
     # App of Apps — ArgoCD now takes over from here
     # ------------------------------------------------------------------ #
     - name: Apply App of Apps root Application

@@ -500,6 +500,43 @@
             OPENROUTESERVICE_API_KEY: "{{ traffinator_openrouteservice_api_key | default('') }}"
 
     # ------------------------------------------------------------------ #
+    # MinIO root credentials (CNPG backup object store)
+    # Run: ansible-playbook -i inventory/hosts.yml apps.yml --tags minio-secrets
+    #
+    # The minio chart reads root creds from this secret (existingSecret: minio-root).
+    # The CNPG ObjectStore and the rclone copy job reuse these keys.
+    #
+    # Required ansible-vault variables (add to vault.yml):
+    #   minio_root_user        — MinIO root access key (e.g. 20 alphanumerics)
+    #   minio_root_password    — MinIO root secret key (e.g. 40 alphanumerics)
+    # ------------------------------------------------------------------ #
+    - name: Create minio namespace
+      tags: minio-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: minio
+
+    - name: Create MinIO root credentials secret
+      tags: minio-secrets
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: minio-root
+            namespace: minio
+          stringData:
+            rootUser: "{{ minio_root_user }}"
+            rootPassword: "{{ minio_root_password }}"
+
+    # ------------------------------------------------------------------ #
     # App of Apps — ArgoCD now takes over from here
     # ------------------------------------------------------------------ #
     - name: Apply App of Apps root Application

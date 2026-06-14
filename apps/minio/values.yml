@@ -1,0 +1,43 @@
+# MinIO — in-cluster S3 object store, used as the CNPG backup target.
+# Chart: minio/minio
+# Repo: https://charts.min.io/
+#
+# Single-instance (standalone) on Longhorn. Holds CNPG base backups + WAL for
+# the traffinator database (short, fast-restore retention). Off-site copies of
+# this bucket go to cloud backends via the rclone CronJob (see apps/backup-sync).
+
+mode: standalone
+replicas: 1
+
+# Root credentials from an Ansible-created secret (keys: rootUser, rootPassword).
+# See ansible/apps.yml tag: minio-secrets.
+existingSecret: minio-root
+
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 20Gi
+
+# Auto-create the backup bucket on install (post-install job uses the root creds)
+buckets:
+  - name: cnpg-backups
+    policy: none
+    purge: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+# Console + API stay ClusterIP — reach via port-forward; no ingress for now.
+service:
+  type: ClusterIP
+consoleService:
+  type: ClusterIP
+
+# Keep the metrics endpoint available for a future ServiceMonitor
+metrics:
+  serviceMonitor:
+    enabled: false

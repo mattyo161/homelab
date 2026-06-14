@@ -1,0 +1,29 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg-barman-plugin
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # Vendored upstream release manifest (pinned v0.13.0) for the CloudNativePG
+  # Barman Cloud Plugin. Installs the ObjectStore CRD + plugin Deployment into
+  # cnpg-system; uses cert-manager (already installed) for its mTLS certs.
+  # Bump: re-download from
+  #   github.com/cloudnative-pg/plugin-barman-cloud/releases/<tag>/manifest.yaml
+  source:
+    repoURL: https://github.com/mattyo161/homelab.git
+    targetRevision: HEAD
+    path: apps/cnpg-barman-plugin
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true   # CRD + cert-manager-managed resources

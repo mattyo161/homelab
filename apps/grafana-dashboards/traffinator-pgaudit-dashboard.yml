@@ -1,0 +1,197 @@
+apiVersion: v1
+data:
+  traffinator-pgaudit.json: |-
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "graphTooltip": 1,
+      "schemaVersion": 39,
+      "tags": [
+        "traffinator",
+        "pgaudit",
+        "postgres"
+      ],
+      "title": "Traffinator \u2014 pgAudit",
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "timezone": "",
+      "templating": {
+        "list": []
+      },
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Audit events (range)",
+          "type": "stat",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "area"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "editorMode": "code",
+              "expr": "sum(count_over_time({namespace=\"traffinator\", container=\"postgres\"} | json | logger=\"pgaudit\" [$__range]))",
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Audit events by class",
+          "type": "timeseries",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 18,
+            "x": 6,
+            "y": 0
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 60,
+                "stacking": {
+                  "mode": "normal"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "editorMode": "code",
+              "expr": "sum by (record_audit_class) (count_over_time({namespace=\"traffinator\", container=\"postgres\"} | json | logger=\"pgaudit\" [$__interval]))",
+              "queryType": "range",
+              "refId": "A",
+              "legendFormat": "{{record_audit_class}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Audit events by command",
+          "type": "timeseries",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 60,
+                "stacking": {
+                  "mode": "normal"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "editorMode": "code",
+              "expr": "sum by (record_audit_command) (count_over_time({namespace=\"traffinator\", container=\"postgres\"} | json | logger=\"pgaudit\" [$__interval]))",
+              "queryType": "range",
+              "refId": "A",
+              "legendFormat": "{{record_audit_command}}"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Recent audit records",
+          "type": "logs",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 24,
+            "x": 0,
+            "y": 12
+          },
+          "options": {
+            "showTime": true,
+            "wrapLogMessage": true,
+            "dedupStrategy": "none",
+            "sortOrder": "Descending"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "editorMode": "code",
+              "expr": "{namespace=\"traffinator\", container=\"postgres\"} | json | logger=\"pgaudit\" | line_format \"{{.record_user_name}}@{{.record_database_name}} [{{.record_audit_class}}] {{.record_audit_command}} :: {{.record_audit_statement}}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+kind: ConfigMap
+metadata:
+  name: traffinator-pgaudit-dashboard
+  namespace: monitoring

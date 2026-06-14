@@ -1,0 +1,18 @@
+# CloudNativePG operator — manages PostgreSQL Clusters on the cluster.
+# Chart: cnpg/cloudnative-pg
+# Repo: https://cloudnative-pg.github.io/charts
+#
+# Consumed by traffinator (postgres.mode: cnpg). The operator watches all
+# namespaces by default, so the Cluster in the traffinator namespace is covered.
+
+crds:
+  create: true
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    memory: 200Mi

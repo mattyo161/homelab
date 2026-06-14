@@ -10,10 +10,15 @@ spec:
   project: default
   sources:
     # Helm chart published as an OCI artifact to GHCR (from the traffinator repo).
-    # Bump targetRevision to deploy a new release — it also selects the app images.
+    # Semver range: auto-pulls every published 0.x release >=0.3.0, stopping
+    # before 1.0.0 — tracks the whole pre-1.0 dev line. ArgoCD re-resolves to the
+    # newest matching version on refresh. Pin to an exact version for a stable cut.
+    # NOTE: requires the traffinator release CI to bump version + appVersion and
+    # publish matching backend/frontend images per release (image tag follows
+    # appVersion); otherwise a resolved chart points at a missing image tag.
     - repoURL: ghcr.io/mattyo161/charts
       chart: traffinator
-      targetRevision: "0.3.0"
+      targetRevision: ">=0.3.0 <1.0.0"
       helm:
         releaseName: traffinator
         valueFiles:

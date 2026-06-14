@@ -1,0 +1,25 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana-dashboards
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # Raw ConfigMaps labeled grafana_dashboard=1; the Grafana sidecar (watching
+  # all namespaces) auto-loads them. One .json dashboard per ConfigMap.
+  source:
+    repoURL: https://github.com/mattyo161/homelab.git
+    targetRevision: HEAD
+    path: apps/grafana-dashboards
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

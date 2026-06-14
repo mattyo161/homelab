@@ -45,6 +45,11 @@ grafana:
 # --- Prometheus ---
 prometheus:
   prometheusSpec:
+    # Discover ServiceMonitors/PodMonitors regardless of the `release` label,
+    # so operator-created monitors (e.g. CloudNativePG's PodMonitor for the
+    # traffinator DB) are scraped without needing a chart label we can't set.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
     affinity:
       nodeAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:

@@ -27,12 +27,21 @@ ingress:
     enabled: true
     secretName: traffinator-tls
 
-# Bundled Postgres on Longhorn — the deployable-today path. To switch to
-# CloudNativePG later: set postgres.enabled=false and point the backend at the
-# CNPG app secret via externalDatabase.existingSecret (see chart README).
+# Database: CloudNativePG Cluster (operator in cnpg-system). HA across 2
+# instances on Longhorn. The backend gets DATABASE_URL from the CNPG-managed
+# traffinator-postgres-app secret automatically.
+#   - pgAudit session auditing -> Postgres stdout -> Vector -> Loki/BetterStack
+#   - DB metrics via PodMonitor into the existing kube-prometheus-stack
 postgres:
-  enabled: true
-  persistence:
-    enabled: true
-    storageClass: longhorn
-    size: 5Gi
+  mode: cnpg
+  cnpg:
+    instances: 2
+    storage:
+      size: 5Gi
+      storageClass: longhorn
+    monitoring:
+      enablePodMonitor: true
+    pgaudit:
+      enabled: true
+      log: "write,ddl,role"   # audited statement classes (pgaudit.log)
+      logCatalog: false        # off avoids noisy system-catalog reads

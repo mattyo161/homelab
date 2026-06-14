@@ -9352,3 +9352,7 @@ kind: ConfigMap
 metadata:
   name: cnpg-cluster-dashboard
   namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Databases"
